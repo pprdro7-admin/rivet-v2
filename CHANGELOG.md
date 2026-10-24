@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: Phase 2 screens (2026-10-24)
+- Web app (`web/`): sign-in, School Tally per SDO (filters, search, flagged first), school page with every
+  building and its rooms, CO values beside validated values, the DE's step on each record, "mark unflagged
+  records as correct as is", new buildings and rooms, DPO complete or return, RO progress by SDO, sign-off,
+  freeze. Every page states that the DepEd CO NSBI remains the official system.
+- Migration 0600: `sdo_progress`, flags as one line per record. 80 checks.
+- `scripts/dev.sh` runs everything locally, with the fixture or CO's real files.
+
 ## Unreleased: Phase 1 foundation (2026-10-24)
 - CO data: cycles (SY 2024–2025 prior, SY 2025–2026 current), source loads, Tables 1 and 2 kept as
   released, `scripts/load_co_tables.py` to load the raw xlsx files.

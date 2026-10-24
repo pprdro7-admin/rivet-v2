@@ -11,7 +11,7 @@ NSBI reporting. SY 2024–2025 is kept read-only for comparison.
 > The official DepEd NSBI remains the system of record. CO's data is never edited here: the field's
 > validation is recorded beside it, and records for deletion are set aside, not removed.
 
-**Status:** Phase 1 (database) done and checked against the real CO files. No screens yet.
+**Status:** Phase 1 (database) done and checked against the real CO files. Phase 2 screens built and clicked through locally on the real files: School Tally, school page with each building and room, new records, DPO check, RO progress and sign-off.
 
 ## What is here
 
@@ -19,7 +19,9 @@ NSBI reporting. SY 2024–2025 is kept read-only for comparison.
 |---|---|
 | `supabase/migrations/` | The database, in order: cycles and CO data (0100), lists (0110), people (0200), validation steps (0300), tally, flags, DPO check, sign-off and baseline (0400), security (0500). |
 | `supabase/seed.sql` | Fictional sample accounts, one per role, for local runs and the validation site. |
-| `supabase/tests/` | 76 automated checks on a tiny fictional CO release. |
+| `supabase/tests/` | 80 automated checks on a tiny fictional CO release. |
+| `web/` | The screens (React, built by Netlify). |
+| `scripts/dev.sh` | Runs everything on one computer, with the fictional fixture or CO's real files, and a "sign in as a sample account" list. |
 | `scripts/test.sh` | Builds a fresh database and runs all checks. |
 | `scripts/load_co_tables.py` | Loads CO's raw Table 1 and Table 2 xlsx files, exactly as released. |
 | `scripts/check_real_data.sh` | Loads the real files into a throwaway database and prints counts and flags, to compare with the v5 workbook. |
@@ -50,7 +52,7 @@ On a machine with Postgres 15 or newer: `scripts/test.sh`. GitHub runs it on eve
 
 ## Next phases
 
-2. Screens: DE worklist, DPO check, School Tally, RO progress by SDO; import of returned v5 workbooks.
+2. Screens: built (see Status). Still to do: import of returned v5 workbooks, and the Supabase validation site on Netlify.
 3. Export in CO's layout per SDO and for Region VII, certification, freeze.
 4. The V1 intelligence views (capacity, gaps, governed rules) on the new baseline, and the
    SY 2024–2025 comparison.
