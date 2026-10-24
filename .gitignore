@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+node_modules/
+.dev/
+dist/
+__pycache__/
+# CO's real files never go in the repository
+*.xlsx
