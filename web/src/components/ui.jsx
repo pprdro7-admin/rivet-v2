@@ -31,7 +31,7 @@ export function Header({ me, onSignOut }) {
   return (
     <>
       {isLocal && <div className="devbar">Local copy for building and testing. Nothing here is sent anywhere.</div>}
-      {!isLocal && !isProduction && <div className="devbar">Validation site of DepEd RO7. Entries here are for testing.</div>}
+      {!isLocal && !isProduction && <div className="devbar">DepEd RO7 pilot validation. Your entries are saved and will be carried over once the Regional Office has reviewed them.</div>}
       <div className="official">
         The DepEd Central Office NSBI remains the official system and reporting. RIVET is an RO7 innovation that keeps the region's own validated record.
       </div>
