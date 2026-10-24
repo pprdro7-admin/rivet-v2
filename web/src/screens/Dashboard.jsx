@@ -179,7 +179,9 @@ function Legend({ a = 'NSBI', b = 'Validated' }) {
 // SY 2024-2025 and other years with school-level tables only.
 function SchoolTablesView({ data, label }) {
   const t = {};
-  data.totals.forEach((x) => { t[x.measure] = (t[x.measure] ?? 0) + Number(x.total); });
+  // Tables 4 and 5 repeat the enrollment columns: read each figure from its own table only.
+  const FROM = { T3: /^(tls|makeshift)_/, T5: /^total_seat_/, CLS: /^(enrollment|instructional_rooms|noninstructional_rooms)_/ };
+  data.totals.forEach((x) => { if (FROM[x.co_table]?.test(x.measure)) t[x.measure] = (t[x.measure] ?? 0) + Number(x.total); });
   const w = (x) => n(Math.round(x));
   const has = data.totals.length > 0;
   if (!has) return <div className="notice info">The NSBI {label} school-level tables are not loaded yet.</div>;
