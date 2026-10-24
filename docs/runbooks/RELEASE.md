@@ -31,3 +31,7 @@ rollback never deletes what DEs and DPOs recorded.
    files to the same `co-files` bucket and run the "Load CO's other NSBI tables" workflow, which defaults
    to the SY 2024-2025 file names. These are shown read-only on each school page, from the latest cycle
    CO has released each table for; they are not validated. Each table loads once per cycle.
+7. Enrollment (for the Dashboard's classroom gap and priority schools): upload LIS's school-level
+   enrollment xlsx to `co-files` and run the "Load LIS enrollment" workflow with its school year and
+   source line. Until a file is loaded, the Dashboard says the classroom gap appears once enrollment is
+   loaded. The latest school year loaded is used. Each school year and source loads once.

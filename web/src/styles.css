@@ -213,3 +213,8 @@ label.f.inline { min-width: 200px; }
 .barline span { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .barline:hover i { filter: brightness(0.9); }
 @media (max-width: 560px) { .pair { grid-template-columns: 1fr; gap: 4px; } }
+.pair.pick { cursor: pointer; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; }
+.pair.pick:hover, .pair.pick:focus-visible { background: var(--blue-soft); outline: none; }
+.pair.pick u { text-decoration-color: var(--line); text-underline-offset: 3px; }
+.section-h { font-size: 22px; margin-top: 8px; }
+label.check { display: inline-flex; gap: 8px; align-items: center; }

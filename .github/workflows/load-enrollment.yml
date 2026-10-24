@@ -1,0 +1,45 @@
+name: Load LIS enrollment
+
+# Loads LIS school-level enrollment by grade (public schools) into the validation project, read-only.
+# The Dashboard's classroom gap and priority schools use the latest school year loaded. As with the
+# NSBI tables, the xlsx goes only in the private Storage bucket "co-files", never in this repository.
+on:
+  workflow_dispatch:
+    inputs:
+      school_year:
+        description: 'School year of the enrollment'
+        default: SY2024-2025
+      source:
+        description: 'Source, as it should read on the Dashboard'
+        default: 'LIS BOSY, generated as of 30 January 2025'
+      file:
+        description: 'File name in the co-files bucket'
+        default: 'LIS_BOSY_SY2024-2025_school_level_enrollment.xlsx'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: validation
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      YEAR: ${{ inputs.school_year }}
+      SOURCE: ${{ inputs.source }}
+      FILE: ${{ inputs.file }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5
+      - name: Download the file from Storage
+        run: python3 scripts/fetch_co_files.py co-files "$FILE" downloads
+      - name: Load
+        run: python3 scripts/load_enrollment.py "$YEAR" "$SOURCE" "downloads/$FILE"
+      - name: Count what was loaded
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
+            select count(*) as schools, sum(coalesce(kinder,0)+coalesce(g1,0)+coalesce(g2,0)+coalesce(g3,0)+coalesce(g4,0)+coalesce(g5,0)+coalesce(g6,0)
+                   +coalesce(es_ng,0)+coalesce(g7,0)+coalesce(g8,0)+coalesce(g9,0)+coalesce(g10,0)+coalesce(jhs_ng,0)+coalesce(g11,0)+coalesce(g12,0)) as learners,
+                   count(*) filter (where exists (select 1 from cycle_schools c where c.cycle_id = 'SY2025-2026' and c.school_id = e.school_id)) as in_sy2025_2026
+            from enrollments e where school_year = '$YEAR';"
