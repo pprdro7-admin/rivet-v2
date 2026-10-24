@@ -1,0 +1,52 @@
+name: Load CO's NSBI tables
+
+# Loads CO's raw Table 1 and Table 2 for one cycle into the validation project, exactly as released.
+# The xlsx files never go in this repository: PPRD uploads them to the private Supabase Storage bucket
+# "co-files", and this workflow downloads them with the project's secret key (SUPABASE_SECRET_KEY,
+# environment "validation"). A cycle's tables load only once; a rerun after success is refused.
+on:
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: 'Cycle'
+        type: choice
+        options: [SY2025-2026, SY2024-2025]
+        default: SY2025-2026
+      table1:
+        description: 'Table 1 file name in the co-files bucket'
+        default: '2025-26_NSBI_Table_1_Summary-of-Existing-Building-Structures_as_of_10212026.xlsx'
+      table2:
+        description: 'Table 2 file name in the co-files bucket'
+        default: '2025-26_NSBI_Table_2_Existing-Rooms-per-Building_as_of_10212026.xlsx'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: validation
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas==2.2.3 openpyxl==3.1.5
+      - name: Download the files from Storage
+        env:
+          TABLE1: ${{ inputs.table1 }}
+          TABLE2: ${{ inputs.table2 }}
+        run: python3 scripts/fetch_co_files.py co-files "$TABLE1" "$TABLE2" downloads
+      - name: Load Table 1 and Table 2
+        env:
+          TABLE1: ${{ inputs.table1 }}
+          TABLE2: ${{ inputs.table2 }}
+        run: python3 scripts/load_co_tables.py "${{ inputs.cycle }}" "downloads/$TABLE1" "downloads/$TABLE2"
+      - name: Count what was loaded
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
+            select s.code as sdo,
+                   (select count(*) from cycle_schools c where c.cycle_id = '${{ inputs.cycle }}' and c.sdo_code = s.code) as schools,
+                   (select count(*) from co_buildings b where b.cycle_id = '${{ inputs.cycle }}' and b.sdo_code = s.code) as buildings,
+                   (select count(*) from co_rooms r where r.cycle_id = '${{ inputs.cycle }}' and r.sdo_code = s.code) as rooms
+            from sdos s order by s.code;"

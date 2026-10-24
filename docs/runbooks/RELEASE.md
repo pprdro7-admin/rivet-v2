@@ -16,8 +16,14 @@ rollback never deletes what DEs and DPOs recorded.
    (Project Settings > Database > Connection string, URI, session pooler).
 2. GitHub: Settings > Environments > New environment `validation`, add the secret `SUPABASE_DB_URL`.
    Run the "Update the validation database" workflow once, ticking "load the sample accounts".
+   The password in the connection string should be letters and digits only: symbols such as `@ # / ?`
+   break the string ("failed to parse connection string").
 3. Netlify: add a site from this repository with base directory `web`. Set `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` from Supabase > Project Settings > API.
 4. Accounts: add each tester under Supabase > Authentication > Users, then give them a row in `profiles`
-   (role and SDO).
-5. CO data: load Tables 1 and 2 with `scripts/load_co_tables.py`, pointed at the validation project.
+   (role and SDO). The site must be public on Netlify so people reach the sign-in page; the data stays
+   behind each account and the database's per-SDO rules.
+5. CO data: in Supabase > Storage, create a **private** bucket `co-files` and upload CO's Table 1 and
+   Table 2 xlsx files. Add the project's secret key (Project Settings > API Keys, `sb_secret_...`) to the
+   `validation` environment as `SUPABASE_SECRET_KEY`. Run the "Load CO's NSBI tables" workflow with the
+   two file names. The files never go in this repository. Each cycle loads once.
