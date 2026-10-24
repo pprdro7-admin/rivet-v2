@@ -65,6 +65,7 @@ select tests.fails(format('select record_room_validation(%s, %s, ''correct'')', 
 
 select tests.login('ro');
 select tests.fails('select freeze_cycle(''SY2025-2026'')', '23514', 'a cycle cannot be frozen while an SDO is not signed off');
+select tests.fails('select freeze_cycle(''SY2024-2025'')', '23514', 'a cycle with no CO data loaded cannot be frozen');
 
 -- The validated baseline.
 select tests.ok((select count(*) from baseline_buildings where school_id = '900001') = 3
