@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorNote, Loading } from '../components/ui.jsx';
-import { n, pct } from '../lib/labels.js';
+import { n, pct, ratio, REGION_ROLES } from '../lib/labels.js';
 import { fetchAll } from '../lib/fetchAll.js';
 
 // Dashboard: the NSBI as reported beside the validated record, for the viewer's own scope
@@ -13,7 +13,7 @@ export default function Dashboard({ db, me }) {
   const [sdo, setSdo] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const isRegion = me.role === 'ro' || me.role === 'admin';
+  const isRegion = REGION_ROLES.includes(me.role);
 
   useEffect(() => {
     Promise.all([db.from('dash_years').select('*').order('cycle_id', { ascending: false }), db.from('sdos').select('code, name').order('name')])
@@ -195,7 +195,7 @@ function SchoolTablesView({ data, label }) {
       <div className="grid tiles">
         <Tile big={n(enrol)} text="learners enrolled" />
         <Tile big={w(rooms)} text="instructional rooms" />
-        <Tile big={rooms ? (enrol / rooms).toFixed(1) : '—'} text="learners per instructional room" />
+        <Tile big={rooms ? ratio(enrol / rooms) : '—'} text="learners per instructional room" />
         <Tile big={n((t.tls_count_es ?? 0) + (t.tls_count_ss ?? 0))} text="temporary learning spaces" />
         <Tile big={n((t.makeshift_count_es ?? 0) + (t.makeshift_count_ss ?? 0))} text="makeshift rooms" />
         <Tile big={n(lv('total_seat'))} text="seats (Table 5)" />
@@ -214,7 +214,7 @@ function SchoolTablesView({ data, label }) {
                     <td className="num" data-label="Learners">{n(e)}</td>
                     <td className="num" data-label="Instructional rooms">{w(ir)}</td>
                     <td className="num" data-label="Non-instructional rooms">{w(t[`noninstructional_rooms_${k}`] ?? 0)}</td>
-                    <td className="num" data-label="Learners per room">{ir ? (e / ir).toFixed(1) : '—'}</td>
+                    <td className="num" data-label="Learners per room">{ir ? ratio(e / ir) : '—'}</td>
                   </tr>
                 );
               })}
@@ -370,7 +370,7 @@ function Gap({ rows, isRegion, sdos }) {
                       <td className="num" data-label="Needed">{x.has_enrollment ? n(x.rooms_needed) : '—'}</td>
                       <td className="num" data-label="Usable">{n(x.usable_rooms)}</td>
                       <td className="num" data-label="Short">{x.gap > 0 ? <b>{n(x.gap)}</b> : x.has_enrollment ? 0 : '—'}</td>
-                      <td className="num" data-label="Learners per room">{x.learners_per_room ?? '—'}</td>
+                      <td className="num" data-label="Learners per room">{x.learners_per_room == null ? '—' : ratio(x.learners_per_room)}</td>
                       <td className="num" data-label="Major repair">{n(x.usable_major_repair)}</td>
                       <td className="num" data-label="Locked">{n(x.locked_rooms)}</td>
                       <td className="num" data-label="Validated">{pct(x.rooms_listed ? x.rooms_with_status / x.rooms_listed : 0)}</td>

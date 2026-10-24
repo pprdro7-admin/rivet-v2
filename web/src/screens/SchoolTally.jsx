@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct } from '../lib/labels.js';
 import { fetchAll } from '../lib/fetchAll.js';
+import { CoNotes, StateChip } from '../components/Returns.jsx';
 
 const SHOW = {
   all: ['All schools', () => true],
   todo: ['Not yet 100% validated', (s) => Number(s.share_validated) < 1],
   check: ['Ready for the DPO check', (s) => Number(s.share_validated) === 1 && !s.dpo_complete],
   returned: ['Returned to DE', (s) => s.dpo_result === 'returned' && !s.dpo_complete],
+  sentBack: ['Sent back to the school', (s, r) => !!r[s.school_id]],
   complete: ['Complete', (s) => s.dpo_complete],
 };
 
@@ -17,20 +19,24 @@ export default function SchoolTally({ db, me, sdoCode }) {
   const [error, setError] = useState(null);
   const [q, setQ] = useState('');
   const [show, setShow] = useState(me.role === 'dpo' ? 'check' : 'todo');
+  const [returns, setReturns] = useState({});
 
   useEffect(() => {
     setRows(null);
     fetchAll(() => db.from('school_tally').select('*').eq('cycle_id', CYCLE).eq('sdo_code', sdoCode)
       .order('flagged_rooms', { ascending: false }).order('school_name'))
       .then(setRows, setError);
+    db.from('return_status').select('school_id, state').eq('cycle_id', CYCLE).eq('kind', 'de_to_school')
+      .eq('sdo_code', sdoCode).neq('state', 'closed')
+      .then(({ data }) => setReturns(Object.fromEntries((data ?? []).map((r) => [r.school_id, r.state]))));
   }, [db, sdoCode]);
 
   const shown = useMemo(() => {
     if (!rows) return [];
     const words = q.trim().toLowerCase();
-    return rows.filter(SHOW[show][1]).filter((s) => !words
+    return rows.filter((s) => SHOW[show][1](s, returns)).filter((s) => !words
       || s.school_name.toLowerCase().includes(words) || s.school_id.includes(words) || (s.district || '').toLowerCase().includes(words));
-  }, [rows, q, show]);
+  }, [rows, q, show, returns]);
 
   if (error) return <main className="page"><ErrorNote error={error} /></main>;
   if (!rows) return <main className="page"><Loading /></main>;
@@ -69,7 +75,8 @@ export default function SchoolTally({ db, me, sdoCode }) {
                   <td className="num" data-label="Flagged rooms">{s.flagged_rooms || ''}</td>
                   <td data-label="Validated"><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
                   <td data-label="DPO check">{s.dpo_complete ? <span className="chip green">Complete</span>
-                    : s.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : ''}</td>
+                    : s.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : ''}
+                    {returns[s.school_id] && <div style={{ marginTop: 4 }}>{returns[s.school_id] === 'open' ? <span className="chip amber">Sent back to school</span> : <StateChip state="answered" />}</div>}</td>
                 </tr>
               ))}
             </tbody>
@@ -78,6 +85,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
         {shown.length > 300 && <p className="muted small">Showing 300 of {n(shown.length)}. Search to narrow the list.</p>}
         {shown.length === 0 && <p className="muted">No schools in this list.</p>}
       </div>
+      <CoNotes db={db} me={me} sdoCode={sdoCode} />
     </main>
   );
 }

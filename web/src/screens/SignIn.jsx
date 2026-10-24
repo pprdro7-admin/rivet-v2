@@ -9,6 +9,7 @@ const SAMPLE_ACCOUNTS = [
   ['03', 'Division Engineer, Cebu City'],
   ['04', 'Division Planning Officer, Cebu City'],
   ['05', 'Regional Office (PPRD)'],
+  ['08', 'Central Office (view only)'],
   ['07', 'School account (sample school)'],
 ];
 
@@ -40,7 +41,7 @@ export default function SignIn({ onSignedIn }) {
       <div className="card" style={{ gap: 16 }}>
         <h1>Sign in to RIVET</h1>
         <p style={{ margin: 0 }}>
-          For schools, Division Engineers, Division Planning Officers and the Regional Office. A school sees
+          For schools, Division Engineers, Division Planning Officers, the Regional Office and the Central Office. A school sees
           its own School ID; SDO staff see the schools of their SDO. The record belongs to each School ID, so it stays when people move.
         </p>
         {!isLocal && (
@@ -49,7 +50,7 @@ export default function SignIn({ onSignedIn }) {
             <label className="f">Password<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
             {error && <ErrorNote error={error} />}
             <button type="submit" className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-            <p className="small muted" style={{ margin: 0 }}>PPRD gives you your email and password.</p>
+            <p className="small muted" style={{ margin: 0 }}>Schools: your Division Planning Officer gives you your email and starting password. SDO staff: PPRD gives you yours.</p>
           </form>
         )}
         {isLocal && (

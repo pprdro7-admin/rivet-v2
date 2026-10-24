@@ -36,3 +36,34 @@ grant usage on schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+
+-- The columns Supabase Auth keeps for an email-and-password user, and its identities table, so a
+-- school account created by the DPO (migration 1700) is made the same way here. pgcrypto lives in
+-- the `extensions` schema on Supabase.
+create schema if not exists extensions;
+create extension if not exists pgcrypto schema extensions;
+alter table auth.users
+  add column if not exists instance_id uuid,
+  add column if not exists aud text,
+  add column if not exists role text,
+  add column if not exists encrypted_password text,
+  add column if not exists email_confirmed_at timestamptz,
+  add column if not exists last_sign_in_at timestamptz,
+  add column if not exists raw_app_meta_data jsonb,
+  add column if not exists created_at timestamptz,
+  add column if not exists updated_at timestamptz,
+  add column if not exists confirmation_token text,
+  add column if not exists recovery_token text,
+  add column if not exists email_change_token_new text,
+  add column if not exists email_change text;
+create table if not exists auth.identities (
+  id              uuid primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  provider_id     text not null,
+  identity_data   jsonb not null,
+  provider        text not null,
+  last_sign_in_at timestamptz,
+  created_at      timestamptz,
+  updated_at      timestamptz,
+  unique (provider_id, provider)
+);

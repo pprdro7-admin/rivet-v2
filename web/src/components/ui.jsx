@@ -1,5 +1,5 @@
 import React from 'react';
-import { STATUS, ROLE } from '../lib/labels.js';
+import { STATUS, ROLE, REGION_ROLES } from '../lib/labels.js';
 import { isLocal, isProduction } from '../lib/supabase.js';
 
 export function go(path) {
@@ -27,7 +27,7 @@ export function Bar({ share }) {
 
 export function Header({ me, route, onSignOut }) {
   const office = !me ? 'DepEd Region VII'
-    : me.sdo_code ? `SDO ${me.sdos?.name ?? me.sdo_code}` : 'Regional Office · PPRD';
+    : me.sdo_code ? `SDO ${me.sdos?.name ?? me.sdo_code}` : me?.role === 'co' ? 'DepEd Central Office' : 'Regional Office · PPRD';
   return (
     <>
       {isLocal && <div className="devbar">Local copy for building and testing. Nothing here is sent anywhere.</div>}
@@ -39,8 +39,9 @@ export function Header({ me, route, onSignOut }) {
         <div className="topbar-in">
           <a className="brand" href="#/home"><b>RIVET</b><span>{office}</span></a>
           <nav className="nav">
-            {me && <a href="#/home" className={route === '#/dashboard' ? '' : 'on'}>{me.role === 'ro' || me.role === 'admin' ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
+            {me && <a href="#/home" className={route === '#/dashboard' || route === '#/access' ? '' : 'on'}>{REGION_ROLES.includes(me.role) ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
             {me && me.role !== 'school' && <a href="#/dashboard" className={route === '#/dashboard' ? 'on' : ''}>Dashboard</a>}
+            {me && me.role === 'dpo' && <a href="#/access" className={route === '#/access' ? 'on' : ''}>School access</a>}
           </nav>
           {me && (
             <div className="who">

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ErrorNote, Loading, StatusChip } from '../components/ui.jsx';
 import { CYCLE, SOURCE, n, pct, problem, STATUS } from '../lib/labels.js';
 import OtherNsbiData from '../components/OtherNsbiData.jsx';
+import { CoNotes, SendBack, loadSendBack } from '../components/Returns.jsx';
 
 // One school: every building with its rooms, the SDO's step on each, the school's updates waiting for
 // the SDO, new records, the DPO's check.
@@ -26,12 +27,13 @@ export default function School({ db, me, schoolId }) {
     const bad = res.find((r) => r.error);
     if (bad) { setError(bad.error); return; }
     const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates] = res.map((r) => r.data);
-    const [bf, rf] = await Promise.all([
+    const [bf, rf, sendBack] = await Promise.all([
       db.from('building_flag_text').select('*').in('building_id', buildings.map((b) => b.building_id)),
       db.from('room_flag_text').select('*').in('room_id', rooms.map((r) => r.room_id)),
+      loadSendBack(db, schoolId),
     ]);
     const flagsOf = (rows, key) => Object.fromEntries((rows.data || []).map((x) => [x[key], x.flags]));
-    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems,
+    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems, sendBack,
       updates: Object.fromEntries(updates.map((u) => [`${u.kind === 'building' ? 'b' : 'r'}:${u.record_id}`, u])),
       bflags: flagsOf(bf, 'building_id'), rflags: flagsOf(rf, 'room_id') });
   }, [db, schoolId]);
@@ -94,6 +96,9 @@ export default function School({ db, me, schoolId }) {
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}
 
+      <SendBack db={db} schoolId={schoolId} sendBack={data.sendBack} buildings={data.buildings} rooms={data.rooms}
+        isSDO={isSDO} isSchool={isSchool} onDone={(m) => { setNote({ ok: m }); load(); }} />
+
       {isSchool && (
         <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
       )}
@@ -120,6 +125,7 @@ export default function School({ db, me, schoolId }) {
               {b.final_longitude !== b.longitude && <span>Coordinates corrected: {b.final_longitude}, {b.final_latitude}</span>}
             </div>
             {data.bflags[b.building_id] && <div className="flags">{data.bflags[b.building_id]}</div>}
+            {data.sendBack.notes[`building:${b.building_id}`] && <div className="note-row small"><b>Sent back:</b> {data.sendBack.notes[`building:${b.building_id}`]}</div>}
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
             <SchoolUpdate u={data.updates[`b:${b.building_id}`]} rec={b} kind="building" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
             {canEdit && open !== `b:${b.building_id}` && (
@@ -142,6 +148,7 @@ export default function School({ db, me, schoolId }) {
                         <td data-label="Actual usage">{(r.final_actual_usages || []).join(', ')}
                           {r.usage_locked && <div className="small muted">Usage locked</div>}
                           {data.rflags[r.room_id] && <div className="flags">{data.rflags[r.room_id]}</div>}
+                          {data.sendBack.notes[`room:${r.room_id}`] && <div className="note-row small"><b>Sent back:</b> {data.sendBack.notes[`room:${r.room_id}`]}</div>}
                           {r.needs_room_decision && <div className="small" style={{ color: 'var(--red)' }}>The building is for deletion: decide this room too.</div>}
                           {r.remarks && <div className="small"><b>Remarks:</b> {r.remarks}</div>}
                           <SchoolUpdate u={data.updates[`r:${r.room_id}`]} rec={r} kind="room" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
@@ -175,7 +182,8 @@ export default function School({ db, me, schoolId }) {
 
       {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
       <OtherNsbiData db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => setNote({ ok: m })} />
-      {(isDPO || me.role === 'ro') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
+      <CoNotes db={db} me={me} schoolId={schoolId} schoolSdo={t.sdo_code} />
+      {(isDPO || me.role === 'ro' || me.role === 'co') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
     </main>
   );
 }

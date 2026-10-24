@@ -6,6 +6,8 @@ import Dashboard from './screens/Dashboard.jsx';
 import SchoolTally from './screens/SchoolTally.jsx';
 import RegionProgress from './screens/RegionProgress.jsx';
 import School from './screens/School.jsx';
+import SchoolAccess from './screens/SchoolAccess.jsx';
+import { REGION_ROLES } from './lib/labels.js';
 
 function useRoute() {
   const [route, setRoute] = useState(window.location.hash || '#/home');
@@ -55,11 +57,13 @@ export default function App() {
   let page;
   if (me === undefined || !db) page = <div className="page"><Loading /></div>;
   else if (!me) page = <SignIn onSignedIn={load} />;
+  else if (me.active === false) page = <div className="page"><div className="notice warn">This account no longer has access to RIVET. If you still need it, ask your Division Planning Officer.</div></div>;
   else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
   else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;
+  else if (route === '#/access' && me.role === 'dpo') page = <SchoolAccess db={db} me={me} />;
   else if (route.startsWith('#/sdo/')) page = <SchoolTally db={db} me={me} sdoCode={route.slice('#/sdo/'.length)} />;
-  else if (me.role === 'ro' || me.role === 'admin') page = <RegionProgress db={db} me={me} />;
+  else if (REGION_ROLES.includes(me.role)) page = <RegionProgress db={db} me={me} />;
   else page = <SchoolTally db={db} me={me} sdoCode={me.sdo_code} />;
 
   return (

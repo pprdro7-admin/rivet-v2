@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct, problem } from '../lib/labels.js';
+import { CoNotes } from '../components/Returns.jsx';
 
 // Regional Office home: where each SDO stands, sign-off, and freezing the cycle.
 export default function RegionProgress({ db, me }) {
@@ -87,6 +88,7 @@ export default function RegionProgress({ db, me }) {
       {me.role === 'ro' && !cycle?.frozen_at && (
         <div className="btns"><button type="button" className="btn secondary" disabled={t.signed < rows.length} onClick={freeze}>Freeze SY 2025–2026 as the baseline</button></div>
       )}
+      <CoNotes db={db} me={me} />
     </main>
   );
 }

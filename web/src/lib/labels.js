@@ -3,6 +3,7 @@ export const ROLE = {
   dpo: 'Division Planning Officer',
   ro: 'Regional Office (PPRD)',
   admin: 'Administrator',
+  co: 'Central Office (view only)',
   school: 'School',
 };
 
@@ -30,3 +31,11 @@ export function problem(error) {
   if (!error) return null;
   return error.message || String(error);
 }
+
+// Learners per room as a ratio, rounded to a whole learner: 1:36.
+export function ratio(x) {
+  return x === null || x === undefined ? '' : `1:${Math.round(Number(x))}`;
+}
+
+// Roles that see the whole region.
+export const REGION_ROLES = ['ro', 'admin', 'co'];
