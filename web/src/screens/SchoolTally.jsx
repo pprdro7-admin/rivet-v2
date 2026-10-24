@@ -53,7 +53,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
       </div>
       <div className="card">
         <div className="scroll">
-          <table>
+          <table className="cards">
             <thead><tr>
               <th>School</th><th>District</th>
               <th className="num">Buildings CO → now</th><th className="num">Rooms CO → now</th>
@@ -63,12 +63,12 @@ export default function SchoolTally({ db, me, sdoCode }) {
               {shown.slice(0, 300).map((s) => (
                 <tr key={s.school_id} className="click" onClick={() => go(`#/school/${s.school_id}`)}>
                   <td><a href={`#/school/${s.school_id}`}>{s.school_name}</a><div className="mono muted">{s.school_id}</div></td>
-                  <td>{s.district}</td>
-                  <td className="num">{s.co_buildings} → <b style={{ color: s.buildings_after !== s.co_buildings ? 'var(--red)' : undefined }}>{s.buildings_after}</b></td>
-                  <td className="num">{s.co_rooms} → <b style={{ color: s.rooms_after !== s.co_rooms ? 'var(--red)' : undefined }}>{s.rooms_after}</b></td>
-                  <td className="num">{s.flagged_rooms || ''}</td>
-                  <td><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
-                  <td>{s.dpo_complete ? <span className="chip green">Complete</span>
+                  <td data-label="District">{s.district}</td>
+                  <td className="num" data-label="Buildings CO → now">{s.co_buildings} → <b style={{ color: s.buildings_after !== s.co_buildings ? 'var(--red)' : undefined }}>{s.buildings_after}</b></td>
+                  <td className="num" data-label="Rooms CO → now">{s.co_rooms} → <b style={{ color: s.rooms_after !== s.co_rooms ? 'var(--red)' : undefined }}>{s.rooms_after}</b></td>
+                  <td className="num" data-label="Flagged rooms">{s.flagged_rooms || ''}</td>
+                  <td data-label="Validated"><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
+                  <td data-label="DPO check">{s.dpo_complete ? <span className="chip green">Complete</span>
                     : s.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : ''}</td>
                 </tr>
               ))}

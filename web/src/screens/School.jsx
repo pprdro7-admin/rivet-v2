@@ -118,21 +118,21 @@ export default function School({ db, me, schoolId }) {
             )}
 
             <div className="scroll">
-              <table>
+              <table className="cards">
                 <thead><tr><th>Room</th><th>Condition</th><th>Usage</th><th>Actual usage</th><th>Status</th><th /></tr></thead>
                 <tbody>
                   {rooms.map((r) => (
                     <React.Fragment key={r.room_id}>
                       <tr className={r.needs_room_decision ? 'red' : ''}>
                         <td>{r.room_no}<div className="mono muted">{r.room_code ?? 'no code'}</div></td>
-                        <td>{r.final_condition ?? '—'}{r.final_condition !== r.room_condition && <div className="co small">CO: {r.room_condition ?? 'blank'}</div>}</td>
-                        <td>{r.final_usage ?? '—'}{r.final_usage !== r.room_usage && <div className="co small">CO: {r.room_usage ?? 'blank'}</div>}</td>
-                        <td>{(r.final_actual_usages || []).join(', ')}
+                        <td data-label="Condition">{r.final_condition ?? '—'}{r.final_condition !== r.room_condition && <div className="co small">CO: {r.room_condition ?? 'blank'}</div>}</td>
+                        <td data-label="Usage">{r.final_usage ?? '—'}{r.final_usage !== r.room_usage && <div className="co small">CO: {r.room_usage ?? 'blank'}</div>}</td>
+                        <td data-label="Actual usage">{(r.final_actual_usages || []).join(', ')}
                           {data.rflags[r.room_id] && <div className="flags">{data.rflags[r.room_id]}</div>}
                           {r.needs_room_decision && <div className="small" style={{ color: 'var(--red)' }}>The building is for deletion: decide this room too.</div>}
                           {r.remarks && <div className="small"><b>Remarks:</b> {r.remarks}</div>}
                         </td>
-                        <td><StatusChip status={r.status} /></td>
+                        <td data-label="Status"><StatusChip status={r.status} /></td>
                         <td>{isDE && open !== `r:${r.room_id}` && <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{r.status ? 'Change' : 'Status'}</button>}</td>
                       </tr>
                       {open === `r:${r.room_id}` && (
@@ -154,7 +154,7 @@ export default function School({ db, me, schoolId }) {
           <div className="bldg-head"><h2>New building {nb.building_no}</h2><span className="chip blue">Missing from CO file</span></div>
           <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span></div>
           <div className="small"><b>Remarks:</b> {nb.remarks}</div>
-          <table><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
+          <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
           {isDE && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} onDone={done} onFail={fail} />}
         </section>
       ))}
@@ -169,9 +169,9 @@ function NewRoomRow({ r }) {
   return (
     <tr>
       <td>{r.room_no ?? 'new'}<div className="muted small">new room</div></td>
-      <td>{r.room_condition}</td><td>{r.room_usage}</td>
-      <td>{r.actual_usages.join(', ')}<div className="small"><b>Remarks:</b> {r.remarks}</div></td>
-      <td><span className="chip blue">Missing from CO file</span></td><td />
+      <td data-label="Condition">{r.room_condition}</td><td data-label="Usage">{r.room_usage}</td>
+      <td data-label="Actual usage">{r.actual_usages.join(', ')}<div className="small"><b>Remarks:</b> {r.remarks}</div></td>
+      <td data-label="Status"><span className="chip blue">Missing from CO file</span></td><td />
     </tr>
   );
 }

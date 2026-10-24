@@ -164,3 +164,24 @@ a.tile:hover, button.tile:hover { border-color: var(--blue); cursor: pointer; }
 .btn.sm { min-height: 36px; padding: 0 12px; font-size: 14px; }
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .filters label.f { flex: 1 1 200px; }
+
+/* Phones: each table row becomes a small card, with the column name beside each value. */
+@media (max-width: 720px) {
+  table.cards thead { display: none; }
+  table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
+  table.cards tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  table.cards td { border: 0; padding: 3px 0; }
+  table.cards td[data-label] { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 4px 6px; text-align: right; }
+  table.cards td[data-label]::before { content: attr(data-label); flex: none; margin-right: auto; max-width: 45%; text-align: left; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  table.cards td[data-label] > .stack { flex: 0 1 160px; }
+  table.cards td:empty { display: none; }
+  table.cards td:first-child { font-weight: 600; }
+  table.cards td:last-child:not([data-label]) .btn { width: 100%; margin-top: 6px; }
+  table.cards tr.red { background: var(--red-soft); padding-left: 10px; padding-right: 10px; border-radius: 8px; }
+  .card { padding: 16px; }
+  .bldg { padding: 12px; }
+  h1 { font-size: 23px; }
+  .official, .devbar { font-size: 12px; padding: 5px 12px; }
+  .btn { width: 100%; }
+  .btns .btn, .btn.sm { width: auto; flex: 1 1 auto; }
+}

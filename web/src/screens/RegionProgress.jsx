@@ -61,7 +61,7 @@ export default function RegionProgress({ db, me }) {
       </div>
       <div className="card">
         <div className="scroll">
-          <table>
+          <table className="cards">
             <thead><tr>
               <th>SDO</th><th className="num">Schools</th><th className="num">Buildings</th><th className="num">Rooms</th>
               <th className="num">Flagged rooms</th><th>Validated</th><th className="num">Schools complete</th><th className="num">Returned</th><th>Sign-off</th>
@@ -70,14 +70,14 @@ export default function RegionProgress({ db, me }) {
               {rows.map((r) => (
                 <tr key={r.sdo_code} className="click" onClick={() => go(`#/sdo/${r.sdo_code}`)}>
                   <td><a href={`#/sdo/${r.sdo_code}`}>{r.sdo_name}</a></td>
-                  <td className="num">{n(r.schools)}</td>
-                  <td className="num">{n(r.co_buildings)}</td>
-                  <td className="num">{n(r.co_rooms)}</td>
-                  <td className="num">{n(r.flagged_rooms)}</td>
-                  <td><div className="stack" style={{ gap: 4 }}><span>{pct(r.share_validated)}</span><Bar share={r.share_validated} /></div></td>
-                  <td className="num">{n(r.schools_complete)}</td>
-                  <td className="num">{n(r.schools_returned)}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="num" data-label="Schools">{n(r.schools)}</td>
+                  <td className="num" data-label="Buildings">{n(r.co_buildings)}</td>
+                  <td className="num" data-label="Rooms">{n(r.co_rooms)}</td>
+                  <td className="num" data-label="Flagged rooms">{n(r.flagged_rooms)}</td>
+                  <td data-label="Validated"><div className="stack" style={{ gap: 4 }}><span>{pct(r.share_validated)}</span><Bar share={r.share_validated} /></div></td>
+                  <td className="num" data-label="Schools complete">{n(r.schools_complete)}</td>
+                  <td className="num" data-label="Returned">{n(r.schools_returned)}</td>
+                  <td data-label="Sign-off" onClick={(e) => e.stopPropagation()}>
                     {r.signed_at ? <span className="chip green">Signed off</span>
                       : me.role === 'ro' && <button type="button" className="btn sm secondary" disabled={Number(r.schools_complete) < Number(r.schools)} onClick={() => signOff(r)}>Sign off</button>}
                   </td>
