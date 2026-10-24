@@ -50,6 +50,7 @@ const SECTIONS = [
       ['School desks', 'num_schooldesk', ES_JHS_SHS],
       ['Other classroom tables', 'num_otherclasstable', ES_JHS_SHS],
       ['Other classroom chairs', 'num_otherclasschair', ES_JHS_SHS],
+      ['1-seater table and chair (new in SY 2025-2026)', 'num_oneseater', ES_JHS_SHS],
       ['New design 2-seater table and chair', 'num_newtnc', [['elem', 'ES'], ['jhs', 'JHS'], ['shs', 'SHS']]],
       ['Total seats (CO computed)', 'total_seat', ES_JHS_SHS],
     ] },
