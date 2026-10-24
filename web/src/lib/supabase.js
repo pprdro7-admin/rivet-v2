@@ -68,10 +68,12 @@ export async function signInWithPassword(email, password) {
   const db = await getClient();
   const { error } = await db.auth.signInWithPassword({ email: email.trim(), password });
   if (!error) return null;
-  if (/invalid login credentials/i.test(error.message)) return 'That email and password do not match an account.';
-  if (/email not confirmed/i.test(error.message)) return 'This account is not confirmed yet. Ask PPRD to confirm it.';
-  if (/api key/i.test(error.message)) return 'The site cannot reach its database (API key). PPRD: check VITE_SUPABASE_ANON_KEY on Netlify.';
-  return error.message;
+  // Supabase's own words go in brackets, so a problem can be named exactly.
+  const own = ` (${error.code || error.status || ''}: ${error.message})`;
+  if (/invalid login credentials/i.test(error.message)) return 'That email and password do not match an account.' + own;
+  if (/email not confirmed/i.test(error.message)) return 'This account is not confirmed yet. Ask PPRD to confirm it.' + own;
+  if (/api key/i.test(error.message)) return 'The site cannot reach its database (API key). PPRD: check VITE_SUPABASE_ANON_KEY on Netlify.' + own;
+  return error.message + own;
 }
 
 export async function signInLocal(userId) {
