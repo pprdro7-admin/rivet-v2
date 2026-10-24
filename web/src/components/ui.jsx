@@ -25,7 +25,7 @@ export function Bar({ share }) {
   return <div className="bar" aria-hidden="true"><i style={{ width: `${Math.min(100, Number(share || 0) * 100)}%` }} /></div>;
 }
 
-export function Header({ me, onSignOut }) {
+export function Header({ me, route, onSignOut }) {
   const office = !me ? 'DepEd Region VII'
     : me.sdo_code ? `SDO ${me.sdos?.name ?? me.sdo_code}` : 'Regional Office · PPRD';
   return (
@@ -39,7 +39,8 @@ export function Header({ me, onSignOut }) {
         <div className="topbar-in">
           <a className="brand" href="#/home"><b>RIVET</b><span>{office}</span></a>
           <nav className="nav">
-            {me && <a href="#/home" className="on">{me.role === 'ro' || me.role === 'admin' ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
+            {me && <a href="#/home" className={route === '#/dashboard' ? '' : 'on'}>{me.role === 'ro' || me.role === 'admin' ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
+            {me && me.role !== 'school' && <a href="#/dashboard" className={route === '#/dashboard' ? 'on' : ''}>Dashboard</a>}
           </nav>
           {me && (
             <div className="who">

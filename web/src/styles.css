@@ -194,3 +194,22 @@ details.other[open] summary h3::before { content: '▾ '; }
 details.other h4 { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); }
 details.other td { padding: 6px 12px; }
 details.other td[data-label]::before { content: attr(data-label); margin-right: 8px; font-size: 12px; color: var(--muted); }
+
+/* Dashboard: paired bars, NSBI (series 1) and validated (series 2); every value is written out. */
+.filters { display: flex; flex-wrap: wrap; gap: 12px; }
+label.f.inline { min-width: 200px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.chart .s1 { background: #2a78d6; }
+.chart .s2 { background: #1baf7a; }
+.legend { display: flex; gap: 14px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.pairs { display: flex; flex-direction: column; gap: 12px; }
+.pair { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 12px; align-items: center; }
+.pair-label { font-size: 14px; color: var(--ink-2); }
+.pair-bars { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.barline { display: flex; align-items: center; gap: 8px; min-height: 16px; }
+.barline i { height: 12px; min-width: 2px; border-radius: 0 4px 4px 0; display: block; }
+.barline span { font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.barline:hover i { filter: brightness(0.9); }
+@media (max-width: 560px) { .pair { grid-template-columns: 1fr; gap: 4px; } }

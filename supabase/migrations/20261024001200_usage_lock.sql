@@ -190,11 +190,13 @@ select r.id as room_id, r.cycle_id, r.sdo_code, r.school_id, r.building_id, r.bu
        coalesce(bl.status = 'for_deletion', false)
          and rl.status is distinct from 'for_deletion'       as needs_room_decision,
        (select max(v.id) from room_validations v where v.room_id = r.id) as last_step_id,
-       coalesce(rc.locks_usage, false) or building_locks_usage(r.building_id) as usage_locked
+       coalesce(rc.locks_usage, false) or coalesce(bc.locks_usage, false) as usage_locked
 from co_rooms r
 left join room_latest rl on rl.room_id = r.id
 left join building_latest bl on bl.building_id = r.building_id
-left join room_conditions rc on rc.name = coalesce(rl.validated_condition, r.room_condition);
+left join room_conditions rc on rc.name = coalesce(rl.validated_condition, r.room_condition)
+left join co_buildings cb on cb.id = r.building_id
+left join building_conditions bc on bc.name = coalesce(bl.validated_condition, cb.building_condition);
 
 create or replace view school_tally with (security_invoker = true) as
 with b as (

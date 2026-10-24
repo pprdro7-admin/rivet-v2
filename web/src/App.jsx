@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getClient, currentUserId, signOut } from './lib/supabase.js';
 import { Header, Loading, ErrorNote, go } from './components/ui.jsx';
 import SignIn from './screens/SignIn.jsx';
+import Dashboard from './screens/Dashboard.jsx';
 import SchoolTally from './screens/SchoolTally.jsx';
 import RegionProgress from './screens/RegionProgress.jsx';
 import School from './screens/School.jsx';
@@ -56,13 +57,14 @@ export default function App() {
   else if (!me) page = <SignIn onSignedIn={load} />;
   else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
+  else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;
   else if (route.startsWith('#/sdo/')) page = <SchoolTally db={db} me={me} sdoCode={route.slice('#/sdo/'.length)} />;
   else if (me.role === 'ro' || me.role === 'admin') page = <RegionProgress db={db} me={me} />;
   else page = <SchoolTally db={db} me={me} sdoCode={me.sdo_code} />;
 
   return (
     <>
-      <Header me={me || null} onSignOut={handleSignOut} />
+      <Header me={me || null} route={route} onSignOut={handleSignOut} />
       {error && <div className="page"><ErrorNote error={error} /></div>}
       {page}
     </>
