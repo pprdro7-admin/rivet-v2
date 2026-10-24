@@ -174,7 +174,7 @@ export default function School({ db, me, schoolId }) {
       ))}
 
       {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
-      <OtherNsbiData db={db} schoolId={schoolId} />
+      <OtherNsbiData db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => setNote({ ok: m })} />
       {(isDPO || me.role === 'ro') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
     </main>
   );
