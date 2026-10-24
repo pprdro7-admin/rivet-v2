@@ -1,0 +1,34 @@
+name: Update the validation database
+
+# Applies new files in supabase/migrations to the Supabase validation project, after a push to main.
+# The connection string is a repository secret (SUPABASE_DB_URL, environment "validation") set by PPRD;
+# it never appears here.
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+    inputs:
+      load_sample_accounts:
+        description: 'Also load the sample accounts (validation project only, never production)'
+        type: boolean
+        default: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply new migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
+      - name: Load the sample accounts
+        if: ${{ inputs.load_sample_accounts }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
