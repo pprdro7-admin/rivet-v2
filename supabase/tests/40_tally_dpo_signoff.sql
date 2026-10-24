@@ -13,7 +13,7 @@ select tests.ok((select tally_check from building_status where building_code = '
                 'a new room in an existing building counts in its tally');
 select tests.fails('select add_new_building(''SY2025-2026'', ''900001'', 4, ''Good Condition'', '''')', '23514', 'a new building needs remarks');
 select set_config('tests.nb', add_new_building('SY2025-2026', '900001', 4, 'On-going Construction', 'Two-classroom building started 2026')::text, false);
-select add_new_room(null, current_setting('tests.nb')::bigint, 'On-going Construction', 'Instructional', array['Grade 4 Classroom'], 'Part of the new building');
+select add_new_room(null, current_setting('tests.nb')::bigint, 'On-going Construction', null, null, 'Part of the new building, not yet usable');
 
 -- The DPO's check.
 select tests.login('dpo');
@@ -37,12 +37,12 @@ select record_room_validation(tests.r('900001002001'), null, 'for_deletion', p_r
 select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900001', 'complete');
 select tests.ok((select dpo_complete and share_validated = 1 from school_tally where school_id = '900001'), 'the school is complete at 100% validated');
-select tests.ok((select buildings_after = 3 and rooms_after = 4 and rooms_for_deletion = 2 and instructional_rooms_after = 3
+select tests.ok((select buildings_after = 3 and rooms_after = 4 and rooms_for_deletion = 2 and instructional_rooms_after = 2
                  from school_tally where school_id = '900001'),
                 'counts after validation leave out deletions and add the new records');
 
 select tests.login('de');
-select add_new_room(tests.b('900001003'), null, 'Condemned', 'Non-Instructional', array['Supply Room'], 'Missed room');
+select add_new_room(tests.b('900001003'), null, 'Condemned', null, null, 'Missed room');
 select tests.ok(not (select dpo_complete from school_tally where school_id = '900001'), 'a later step by the DE reopens the school');
 select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900001', 'complete');

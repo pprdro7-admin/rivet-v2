@@ -106,6 +106,7 @@ export default function School({ db, me, schoolId }) {
       {data.buildings.map((b) => {
         const rooms = data.rooms.filter((r) => r.building_id === b.building_id);
         const newRooms = data.newRooms.filter((r) => r.building_id === b.building_id);
+        const bldgLocked = locks(lists.bcond, b.final_condition);
         return (
           <section key={b.building_id} className={`card${b.status === 'for_deletion' ? ' flagged' : ''}`}>
             <div className="bldg-head">
@@ -139,6 +140,7 @@ export default function School({ db, me, schoolId }) {
                         <td data-label="Condition">{r.final_condition ?? '—'}{r.final_condition !== r.room_condition && <div className="co small">NSBI: {r.room_condition ?? 'blank'}</div>}</td>
                         <td data-label="Usage">{r.final_usage ?? '—'}{r.final_usage !== r.room_usage && <div className="co small">NSBI: {r.room_usage ?? 'blank'}</div>}</td>
                         <td data-label="Actual usage">{(r.final_actual_usages || []).join(', ')}
+                          {r.usage_locked && <div className="small muted">Usage locked</div>}
                           {data.rflags[r.room_id] && <div className="flags">{data.rflags[r.room_id]}</div>}
                           {r.needs_room_decision && <div className="small" style={{ color: 'var(--red)' }}>The building is for deletion: decide this room too.</div>}
                           {r.remarks && <div className="small"><b>Remarks:</b> {r.remarks}</div>}
@@ -148,7 +150,7 @@ export default function School({ db, me, schoolId }) {
                         <td>{canEdit && open !== `r:${r.room_id}` && <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{isSchool ? 'Update' : r.status ? 'Change' : 'Status'}</button>}</td>
                       </tr>
                       {open === `r:${r.room_id}` && (
-                        <tr><td colSpan={6}><StepForm kind="room" rec={r} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} /></td></tr>
+                        <tr><td colSpan={6}><StepForm kind="room" rec={r} bldgLocked={bldgLocked} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} /></td></tr>
                       )}
                     </React.Fragment>
                   ))}
@@ -156,7 +158,7 @@ export default function School({ db, me, schoolId }) {
                 </tbody>
               </table>
             </div>
-            {canEdit && <NewRoomForm db={db} lists={lists} building={b.building_id} onDone={done} onFail={fail} />}
+            {canEdit && <NewRoomForm db={db} lists={lists} building={b.building_id} bldgLocked={bldgLocked} onDone={done} onFail={fail} />}
           </section>
         );
       })}
@@ -167,7 +169,7 @@ export default function School({ db, me, schoolId }) {
           <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span></div>
           <div className="small"><b>Remarks:</b> {nb.remarks}</div>
           <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
-          {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} onDone={done} onFail={fail} />}
+          {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} bldgLocked={locks(lists.bcond, nb.building_condition)} onDone={done} onFail={fail} />}
         </section>
       ))}
 
@@ -189,10 +191,16 @@ function NewRoomRow({ r }) {
   );
 }
 
+// A room that cannot be used (condemned, under construction, or in such a building) takes no usage entries.
+const locks = (list, name) => !!list.find((c) => c.name === name)?.locks_usage;
+const LOCK_NOTE = 'Usage is locked: the room or its building is condemned or under construction, so no usage is entered.';
+
 // The step on one building or room. Corrections are written beside the NSBI value.
-function StepForm({ kind, rec, lists, db, isSchool, onDone, onFail, onCancel }) {
+function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, onCancel }) {
   const [status, setStatus] = useState(rec.status ?? 'correct');
   const [f, setF] = useState({ condition: '', usage: '', actual: [], lon: '', lat: '', reason: '', remarks: '' });
+  const locked = kind === 'room' && (bldgLocked
+    || locks(lists.rcond, status === 'corrected' && f.condition ? f.condition : rec.room_condition));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const [busy, setBusy] = useState(false);
 
@@ -207,7 +215,7 @@ function StepForm({ kind, rec, lists, db, isSchool, onDone, onFail, onCancel }) 
       ? await db.rpc('record_building_validation', { ...common, p_building: rec.building_id,
         p_longitude: corr && f.lon ? Number(f.lon) : null, p_latitude: corr && f.lat ? Number(f.lat) : null })
       : await db.rpc('record_room_validation', { ...common, p_room: rec.room_id,
-        p_usage: corr && f.usage ? f.usage : null, p_actual_usages: corr && f.actual.length ? f.actual : null });
+        p_usage: corr && !locked && f.usage ? f.usage : null, p_actual_usages: corr && !locked && f.actual.length ? f.actual : null });
     setBusy(false);
     if (error) onFail(error); else onDone(isSchool ? 'Update sent to the Division Engineer.' : `${kind === 'building' ? 'Building' : 'Room'} saved.`);
   }
@@ -233,6 +241,8 @@ function StepForm({ kind, rec, lists, db, isSchool, onDone, onFail, onCancel }) 
               <label className="f">Correct longitude (only if wrong)<input inputMode="decimal" value={f.lon} onChange={set('lon')} placeholder="e.g. 123.9567" /></label>
               <label className="f">Correct latitude (only if wrong)<input inputMode="decimal" value={f.lat} onChange={set('lat')} placeholder="e.g. 9.6129" /></label>
             </>
+          ) : locked ? (
+            <p className="small muted">{LOCK_NOTE}</p>
           ) : (
             <>
               <label className="f">Validated room usage (only if different)
@@ -270,15 +280,16 @@ function StepForm({ kind, rec, lists, db, isSchool, onDone, onFail, onCancel }) 
   );
 }
 
-function NewRoomForm({ db, lists, building, newBuilding, onDone, onFail }) {
+function NewRoomForm({ db, lists, building, newBuilding, bldgLocked, onDone, onFail }) {
   const [show, setShow] = useState(false);
   const [f, setF] = useState({ no: '', condition: '', usage: '', actual: [], remarks: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const locked = bldgLocked || locks(lists.rcond, f.condition);
   if (!show) return <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setShow(true)}>Add a room not in the NSBI</button></div>;
   async function save(e) {
     e.preventDefault();
     const { error } = await db.rpc('add_new_room', { p_building: building ?? null, p_new_building: newBuilding ?? null,
-      p_condition: f.condition, p_usage: f.usage, p_actual_usages: f.actual, p_remarks: f.remarks, p_room_no: f.no ? Number(f.no) : null });
+      p_condition: f.condition, p_usage: locked ? null : f.usage, p_actual_usages: locked ? null : f.actual, p_remarks: f.remarks, p_room_no: f.no ? Number(f.no) : null });
     if (error) onFail(error); else { setShow(false); onDone('New room added.'); }
   }
   return (
@@ -287,12 +298,14 @@ function NewRoomForm({ db, lists, building, newBuilding, onDone, onFail }) {
       <div className="grid">
         <label className="f">Room no.<input inputMode="numeric" value={f.no} onChange={set('no')} /></label>
         <label className="f">Condition<select required value={f.condition} onChange={set('condition')}><option value="">Choose…</option>{lists.rcond.map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
+        {locked ? <p className="small muted">{LOCK_NOTE}</p> : <>
         <label className="f">Room usage<select required value={f.usage} onChange={set('usage')}><option value="">Choose…</option>{lists.usage.map((u) => <option key={u.name}>{u.name}</option>)}</select></label>
         <label className="f">Actual usage (Ctrl-click for several)
           <select multiple required size={5} value={f.actual} style={{ height: 'auto', padding: 6 }} onChange={(e) => setF({ ...f, actual: [...e.target.selectedOptions].map((o) => o.value) })}>
             {lists.actual.map((u) => <option key={u.name}>{u.name}</option>)}
           </select>
         </label>
+        </>}
       </div>
       <label className="f">Remarks: why it is not in the NSBI<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
       <div className="btns"><button type="submit" className="btn sm">Add room</button><button type="button" className="btn sm secondary" onClick={() => setShow(false)}>Cancel</button></div>
