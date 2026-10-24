@@ -24,8 +24,11 @@ def project_ref(db_url):
 
 
 def main():
-    if len(sys.argv) < 4 or "DATABASE_URL" not in os.environ or not os.environ.get("SUPABASE_SECRET_KEY"):
+    if len(sys.argv) < 4 or "DATABASE_URL" not in os.environ:
         sys.exit(__doc__)
+    if not os.environ.get("SUPABASE_SECRET_KEY", "").strip():
+        sys.exit("SUPABASE_SECRET_KEY is empty: add the project's secret key (sb_secret_...) to the "
+                 "GitHub environment 'validation' under exactly that name.")
     bucket, files, outdir = sys.argv[1], sys.argv[2:-1], sys.argv[-1]
     key = os.environ["SUPABASE_SECRET_KEY"].strip()
     base = f"https://{project_ref(os.environ['DATABASE_URL'])}.supabase.co/storage/v1/object"
