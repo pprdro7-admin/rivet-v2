@@ -1,0 +1,67 @@
+name: Load CO's other NSBI tables
+
+# Loads CO's school-level tables for one cycle into the validation project, read-only and exactly as
+# released: Table 3 (TLS and makeshift rooms), Table 4a/4b (water and sanitation), Table 5 (furniture),
+# Table 7 (access going to school) and the number of classrooms by school (enrollment, rooms by usage).
+# As with Tables 1 and 2, the xlsx files go only in the private Storage bucket "co-files", never in
+# this repository. Leave a file name blank to skip that table. Each table loads once per cycle.
+on:
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: 'Cycle'
+        type: choice
+        options: [SY2024-2025, SY2025-2026]
+        default: SY2024-2025
+      table3:
+        description: 'Table 3 file name in the co-files bucket'
+        default: 'REGION VII_SY 2024-2025 TABLE 3 - TEMPORARY LEARNING SPACES (TLS & MAKESHIFT ROOMS).xlsx'
+      table4:
+        description: 'Table 4a&4b file name'
+        default: 'REGION VII_SY 2024-2025 TABLE 4a&4b - EXISTING NUMBER OF WATER AND SANITATION FACIL.xlsx'
+      table5:
+        description: 'Table 5 file name'
+        default: 'REGION VII_SY 2024-2025 TABLE 5 - EXISTING USABLE FURNITURE.xlsx'
+      table7:
+        description: 'Table 7 file name'
+        default: 'REGION VII_SY 2024-2025 TABLE 7 - ACCESS GOING TO SCHOOL.xlsx'
+      classrooms:
+        description: 'Number of classroom by school file name'
+        default: 'REGION VII_SY 2024-2025 NUMBER OF CLASSROOM BY SCHOOL.xlsx'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: validation
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      CYCLE: ${{ inputs.cycle }}
+      F3: ${{ inputs.table3 }}
+      F4: ${{ inputs.table4 }}
+      F5: ${{ inputs.table5 }}
+      F7: ${{ inputs.table7 }}
+      FC: ${{ inputs.classrooms }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5
+      - name: Download the files from Storage
+        run: |
+          files=()
+          for f in "$F3" "$F4" "$F5" "$F7" "$FC"; do [[ -n "$f" ]] && files+=("$f"); done
+          python3 scripts/fetch_co_files.py co-files "${files[@]}" downloads
+      - name: Load the tables
+        run: |
+          files=()
+          for f in "$F3" "$F4" "$F5" "$F7" "$FC"; do [[ -n "$f" ]] && files+=("downloads/$f"); done
+          python3 scripts/load_co_school_tables.py "$CYCLE" "${files[@]}"
+      - name: Count what was loaded
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "
+            select co_table, count(*) as schools,
+                   count(*) filter (where exists (select 1 from cycle_schools c
+                                                  where c.cycle_id = 'SY2025-2026' and c.school_id = r.school_id)) as in_sy2025_2026
+            from co_school_records r where cycle_id = '$CYCLE' group by co_table order by co_table;"

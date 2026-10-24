@@ -47,10 +47,7 @@ export default function RegionProgress({ db, me }) {
 
   return (
     <main className="page">
-      <div className="spread">
-        <h1>SY 2025–2026 validation, Region VII</h1>
-        <span className="muted">CO raw data as of 21 October 2026</span>
-      </div>
+      <h1>SY 2025–2026 validation, Region VII</h1>
       {cycle?.frozen_at && <div className="notice ok">Frozen on {new Date(cycle.frozen_at).toLocaleDateString('en-PH')}: this is the baseline for later NSBI reporting.</div>}
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}

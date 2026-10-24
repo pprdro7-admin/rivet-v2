@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ErrorNote, Loading, StatusChip } from '../components/ui.jsx';
 import { CYCLE, n, pct, problem } from '../lib/labels.js';
+import OtherNsbiData from '../components/OtherNsbiData.jsx';
 
 // One school: every building with its rooms, the DE's step on each, new records, the DPO's check.
 export default function School({ db, me, schoolId }) {
@@ -160,6 +161,7 @@ export default function School({ db, me, schoolId }) {
       ))}
 
       {isDE && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
+      <OtherNsbiData db={db} schoolId={schoolId} />
       {(isDPO || me.role === 'ro') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
     </main>
   );

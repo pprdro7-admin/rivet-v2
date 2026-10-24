@@ -27,3 +27,7 @@ rollback never deletes what DEs and DPOs recorded.
    Table 2 xlsx files. Add the project's secret key (Project Settings > API Keys, `sb_secret_...`) to the
    `validation` environment as `SUPABASE_SECRET_KEY`. Run the "Load CO's NSBI tables" workflow with the
    two file names. The files never go in this repository. Each cycle loads once.
+6. Other NSBI tables (Tables 3, 4a/4b, 5, 7 and the number of classrooms by school): upload CO's xlsx
+   files to the same `co-files` bucket and run the "Load CO's other NSBI tables" workflow, which defaults
+   to the SY 2024-2025 file names. These are shown read-only on each school page, from the latest cycle
+   CO has released each table for; they are not validated. Each table loads once per cycle.

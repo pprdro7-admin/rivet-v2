@@ -185,3 +185,12 @@ a.tile:hover, button.tile:hover { border-color: var(--blue); cursor: pointer; }
   .btn { width: 100%; }
   .btns .btn, .btn.sm { width: auto; flex: 1 1 auto; }
 }
+
+/* Other NSBI data: collapsible read-only sections on the school page */
+details.other summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; cursor: pointer; list-style: none; min-height: 32px; }
+details.other summary::-webkit-details-marker { display: none; }
+details.other summary h3::before { content: '▸ '; color: var(--muted); }
+details.other[open] summary h3::before { content: '▾ '; }
+details.other h4 { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); }
+details.other td { padding: 6px 12px; }
+details.other td[data-label]::before { content: attr(data-label); margin-right: 8px; font-size: 12px; color: var(--muted); }
