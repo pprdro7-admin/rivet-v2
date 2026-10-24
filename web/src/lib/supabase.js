@@ -68,7 +68,10 @@ export async function signInWithPassword(email, password) {
   const db = await getClient();
   const { error } = await db.auth.signInWithPassword({ email: email.trim(), password });
   if (!error) return null;
-  return /invalid/i.test(error.message) ? 'That email and password do not match an account.' : error.message;
+  if (/invalid login credentials/i.test(error.message)) return 'That email and password do not match an account.';
+  if (/email not confirmed/i.test(error.message)) return 'This account is not confirmed yet. Ask PPRD to confirm it.';
+  if (/api key/i.test(error.message)) return 'The site cannot reach its database (API key). PPRD: check VITE_SUPABASE_ANON_KEY on Netlify.';
+  return error.message;
 }
 
 export async function signInLocal(userId) {
