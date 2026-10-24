@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ErrorNote } from './ui.jsx';
 import { n } from '../lib/labels.js';
 
-// The rest of the NSBI for one school: CO's school-level tables, read-only, from the latest cycle
+// The rest of the NSBI for one school: the school-level tables, read-only, from the latest cycle
 // that has each table (school_other_data). Keys are those written by scripts/load_co_school_tables.py.
 
 const ES_SS = [['es', 'Elementary'], ['ss', 'Secondary']];
@@ -52,7 +52,7 @@ const SECTIONS = [
       ['Other classroom chairs', 'num_otherclasschair', ES_JHS_SHS],
       ['1-seater table and chair (new in SY 2025-2026)', 'num_oneseater', ES_JHS_SHS],
       ['New design 2-seater table and chair', 'num_newtnc', [['elem', 'ES'], ['jhs', 'JHS'], ['shs', 'SHS']]],
-      ['Total seats (CO computed)', 'total_seat', ES_JHS_SHS],
+      ['Total seats (computed in the NSBI)', 'total_seat', ES_JHS_SHS],
     ] },
   ] },
   { table: 'T7', title: 'Table 7 · Access going to school', yesNo: true, groups: [
@@ -81,7 +81,7 @@ function Section({ s, rec }) {
   const m = rec.measures;
   return (
     <details className="card other">
-      <summary><h3>{s.title}</h3><span className="muted small">CO {rec.cycle_label}</span></summary>
+      <summary><h3>{s.title}</h3><span className="muted small">NSBI {rec.cycle_label}</span></summary>
       {s.groups.map((g, gi) => (
         <div key={gi} className="stack">
           {g.name && <h4>{g.name}</h4>}
@@ -120,11 +120,11 @@ export default function OtherNsbiData({ db, schoolId }) {
     <section className="stack" style={{ gap: 12 }}>
       <h2>Other NSBI data</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Exactly as CO released them, from the latest school year CO has released each table for. These are
-        for reference and are not validated here; only buildings and rooms are. Table 6 (other facilities)
-        has no regional data from CO yet.
+        As reported in the NSBI, from the latest school year available for each table. Values from an
+        earlier school year are for the school to confirm or update. They are for reference and are not
+        validated here; only buildings and rooms are. Table 6 (other facilities) has no regional data yet.
       </p>
-      {present.length === 0 && <div className="notice info">CO has not released these tables for this School ID.</div>}
+      {present.length === 0 && <div className="notice info">No NSBI data on these tables for this School ID yet.</div>}
       {present.map((s) => <Section key={s.table} s={s} rec={recs[s.table]} />)}
     </section>
   );

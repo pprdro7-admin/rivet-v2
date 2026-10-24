@@ -9,6 +9,7 @@ const SAMPLE_ACCOUNTS = [
   ['03', 'Division Engineer, Cebu City'],
   ['04', 'Division Planning Officer, Cebu City'],
   ['05', 'Regional Office (PPRD)'],
+  ['07', 'School account (sample school)'],
 ];
 
 export default function SignIn({ onSignedIn }) {
@@ -39,8 +40,8 @@ export default function SignIn({ onSignedIn }) {
       <div className="card" style={{ gap: 16 }}>
         <h1>Sign in to RIVET</h1>
         <p style={{ margin: 0 }}>
-          For Division Engineers, Division Planning Officers and the Regional Office. You see the schools
-          of your own SDO. The record belongs to each School ID, so it stays when people move.
+          For schools, Division Engineers, Division Planning Officers and the Regional Office. A school sees
+          its own School ID; SDO staff see the schools of their SDO. The record belongs to each School ID, so it stays when people move.
         </p>
         {!isLocal && (
           <form className="stack" onSubmit={submit}>

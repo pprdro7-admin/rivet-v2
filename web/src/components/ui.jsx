@@ -39,7 +39,7 @@ export function Header({ me, onSignOut }) {
         <div className="topbar-in">
           <a className="brand" href="#/home"><b>RIVET</b><span>{office}</span></a>
           <nav className="nav">
-            {me && <a href="#/home" className="on">{me.role === 'ro' || me.role === 'admin' ? 'Region VII progress' : 'School Tally'}</a>}
+            {me && <a href="#/home" className="on">{me.role === 'ro' || me.role === 'admin' ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
           </nav>
           {me && (
             <div className="who">

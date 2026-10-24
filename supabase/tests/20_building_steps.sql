@@ -35,8 +35,8 @@ select tests.ok(true, 'a demolished building is kept as is');
 select tests.fails(format('select record_building_validation(%s, null, ''correct'')', tests.b('900003001')),
                    '42501', 'a DE cannot validate another SDO''s building');
 select tests.login('dpo');
-select tests.fails(format('select record_building_validation(%s, null, ''correct'')', tests.b('900001002')),
-                   '42501', 'the DPO does not change a building''s status');
+select tests.ok(record_building_validation(tests.b('900001003'), tests.seen_b('900001003'), 'correct') is not null,
+                'for the pilot, the DPO records building steps too');
 select tests.login('ro');
 select tests.fails(format('select record_building_validation(%s, null, ''correct'')', tests.b('900001002')),
                    '42501', 'the RO does not validate buildings');

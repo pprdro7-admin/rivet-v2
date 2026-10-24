@@ -4,12 +4,12 @@ set role authenticated;
 select tests.login('de');
 
 -- Tally flows from Table 2 to Table 1.
-select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Same as CO (2)', 'tally starts the same as CO');
+select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Same as NSBI (2)', 'tally starts the same as the NSBI');
 select record_room_validation(tests.r('900001001002'), null, 'for_deletion', p_reason => 'duplicate_row');
-select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Changed: CO 2 -> now 1',
+select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Changed: NSBI 2, validated 1',
                 'deleting a room changes its building''s validated room count');
 select add_new_room(tests.b('900001001'), null, 'Good Condition', 'Instructional', array['Grade 3 Classroom'], 'Built 2026, not yet in NSBI', 3);
-select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Same as CO (2)',
+select tests.ok((select tally_check from building_status where building_code = '900001001') = 'Same as NSBI (2)',
                 'a new room in an existing building counts in its tally');
 select tests.fails('select add_new_building(''SY2025-2026'', ''900001'', 4, ''Good Condition'', '''')', '23514', 'a new building needs remarks');
 select set_config('tests.nb', add_new_building('SY2025-2026', '900001', 4, 'On-going Construction', 'Two-classroom building started 2026')::text, false);

@@ -3,6 +3,7 @@ export const ROLE = {
   dpo: 'Division Planning Officer',
   ro: 'Regional Office (PPRD)',
   admin: 'Administrator',
+  school: 'School',
 };
 
 export const STATUS = {
@@ -12,6 +13,9 @@ export const STATUS = {
 };
 
 export const CYCLE = 'SY2025-2026';
+
+// The data being validated, as the screens name it.
+export const SOURCE = 'NSBI 2025–2026 (as of 31 May 2026)';
 
 export function pct(share) {
   return `${Math.floor(Number(share || 0) * 100)}%`;

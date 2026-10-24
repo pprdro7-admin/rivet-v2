@@ -54,6 +54,7 @@ export default function App() {
   let page;
   if (me === undefined || !db) page = <div className="page"><Loading /></div>;
   else if (!me) page = <SignIn onSignedIn={load} />;
+  else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
   else if (route.startsWith('#/sdo/')) page = <SchoolTally db={db} me={me} sdoCode={route.slice('#/sdo/'.length)} />;
   else if (me.role === 'ro' || me.role === 'admin') page = <RegionProgress db={db} me={me} />;

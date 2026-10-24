@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ErrorNote, Loading, StatusChip } from '../components/ui.jsx';
-import { CYCLE, n, pct, problem } from '../lib/labels.js';
+import { CYCLE, SOURCE, n, pct, problem, STATUS } from '../lib/labels.js';
 import OtherNsbiData from '../components/OtherNsbiData.jsx';
 
-// One school: every building with its rooms, the DE's step on each, new records, the DPO's check.
+// One school: every building with its rooms, the SDO's step on each, the school's updates waiting for
+// the SDO, new records, the DPO's check.
 export default function School({ db, me, schoolId }) {
   const [data, setData] = useState(null);
   const [lists, setLists] = useState(null);
@@ -20,16 +21,18 @@ export default function School({ db, me, schoolId }) {
       eqs('live_new_buildings').order('id'),
       eqs('live_new_rooms').order('id'),
       db.rpc('school_open_items', { p_cycle: CYCLE, p_school: schoolId }),
+      eqs('school_updates'),
     ]);
     const bad = res.find((r) => r.error);
     if (bad) { setError(bad.error); return; }
-    const [tally, buildings, rooms, newBuildings, newRooms, openItems] = res.map((r) => r.data);
+    const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates] = res.map((r) => r.data);
     const [bf, rf] = await Promise.all([
       db.from('building_flag_text').select('*').in('building_id', buildings.map((b) => b.building_id)),
       db.from('room_flag_text').select('*').in('room_id', rooms.map((r) => r.room_id)),
     ]);
     const flagsOf = (rows, key) => Object.fromEntries((rows.data || []).map((x) => [x[key], x.flags]));
     setData({ tally, buildings, rooms, newBuildings, newRooms, openItems,
+      updates: Object.fromEntries(updates.map((u) => [`${u.kind === 'building' ? 'b' : 'r'}:${u.record_id}`, u])),
       bflags: flagsOf(bf, 'building_id'), rflags: flagsOf(rf, 'room_id') });
   }, [db, schoolId]);
 
@@ -42,26 +45,29 @@ export default function School({ db, me, schoolId }) {
 
   if (error) return <main className="page"><ErrorNote error={error} /></main>;
   if (!data || !lists) return <main className="page"><Loading /></main>;
-  if (!data.tally) return <main className="page"><ErrorNote error="This school is not in your SDO, or not in the SY 2025–2026 CO file." /></main>;
+  if (!data.tally) return <main className="page"><ErrorNote error="This school is not in your SDO, or not in the NSBI 2025–2026 data." /></main>;
 
   const t = data.tally;
-  const isDE = me.role === 'de' && me.sdo_code === t.sdo_code;
+  // Pilot: the DE and the DPO both record steps; a school account updates its own records.
+  const isSDO = ['de', 'dpo'].includes(me.role) && me.sdo_code === t.sdo_code;
+  const isSchool = me.role === 'school';
+  const canEdit = isSDO || isSchool;
   const isDPO = me.role === 'dpo' && me.sdo_code === t.sdo_code;
   const done = (msg) => { setNote({ ok: msg }); setOpen(null); load(); };
   const fail = (e) => setNote({ err: problem(e) });
 
   async function markRestCorrect() {
-    const bs = data.buildings.filter((b) => !b.status && !data.bflags[b.building_id]);
-    const rs = data.rooms.filter((r) => !r.status && !data.rflags[r.room_id] && !r.building_for_deletion);
+    const bs = data.buildings.filter((b) => !b.status && !data.bflags[b.building_id] && !data.updates[`b:${b.building_id}`]);
+    const rs = data.rooms.filter((r) => !r.status && !data.rflags[r.room_id] && !r.building_for_deletion && !data.updates[`r:${r.room_id}`]);
     if (!window.confirm(`Mark ${bs.length} building(s) and ${rs.length} room(s) that have no status and no flag as Correct as is?`)) return;
     let count = 0;
     for (const b of bs) {
-      const { error: e } = await db.rpc('record_building_validation', { p_building: b.building_id, p_seen: b.last_validation_id, p_status: 'correct' });
+      const { error: e } = await db.rpc('record_building_validation', { p_building: b.building_id, p_seen: b.last_step_id, p_status: 'correct' });
       if (e) { fail(`Building ${b.building_code}: ${problem(e)}`); load(); return; }
       count += 1;
     }
     for (const r of rs) {
-      const { error: e } = await db.rpc('record_room_validation', { p_room: r.room_id, p_seen: r.last_validation_id, p_status: 'correct' });
+      const { error: e } = await db.rpc('record_room_validation', { p_room: r.room_id, p_seen: r.last_step_id, p_status: 'correct' });
       if (e) { fail(`Room ${r.room_code ?? r.room_no}: ${problem(e)}`); load(); return; }
       count += 1;
     }
@@ -70,17 +76,17 @@ export default function School({ db, me, schoolId }) {
 
   return (
     <main className="page">
-      <a href={`#/sdo/${t.sdo_code}`} className="small">← School Tally</a>
+      {!isSchool && <a href={`#/sdo/${t.sdo_code}`} className="small">← School Tally</a>}
       <div className="spread">
-        <div><h1>{t.school_name}</h1><span className="mono muted">{t.school_id} · {t.district}</span></div>
+        <div><h1>{t.school_name}</h1><span className="mono muted">{t.school_id} · {t.district}</span><div className="small muted">{SOURCE}, with the SDO's validation</div></div>
         {t.dpo_complete ? <span className="chip green">Complete</span>
           : t.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : null}
       </div>
 
       <div className="today-top">
         <div className="tile"><strong>{pct(t.share_validated)}</strong><span className="muted">validated ({n(t.buildings_with_status + t.rooms_with_status)} of {n(t.co_buildings + t.co_rooms)})</span></div>
-        <div className="tile"><strong>{t.co_buildings} → {t.buildings_after}</strong><span className="muted">buildings, CO → after validation</span></div>
-        <div className="tile"><strong>{t.co_rooms} → {t.rooms_after}</strong><span className="muted">rooms, CO → after validation</span></div>
+        <div className="tile"><strong>{t.co_buildings} → {t.buildings_after}</strong><span className="muted">buildings, NSBI → validated</span></div>
+        <div className="tile"><strong>{t.co_rooms} → {t.rooms_after}</strong><span className="muted">rooms, NSBI → validated</span></div>
         <div className="tile"><strong>{t.co_instructional_rooms} → {t.instructional_rooms_after}</strong><span className="muted">instructional rooms</span></div>
       </div>
 
@@ -88,7 +94,10 @@ export default function School({ db, me, schoolId }) {
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}
 
-      {isDE && (
+      {isSchool && (
+        <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
+      )}
+      {isSDO && (
         <div className="btns">
           <button type="button" className="btn secondary" onClick={markRestCorrect}>Mark unflagged records without a status as Correct as is</button>
         </div>
@@ -105,17 +114,18 @@ export default function School({ db, me, schoolId }) {
             </div>
             <div className="facts">
               <span>{b.building_type}</span>
-              <span>Condition: <b>{b.final_condition}</b>{b.final_condition !== b.building_condition && <span className="co"> (CO: {b.building_condition ?? 'blank'})</span>}</span>
+              <span>Condition: <b>{b.final_condition}</b>{b.final_condition !== b.building_condition && <span className="co"> (NSBI: {b.building_condition ?? 'blank'})</span>}</span>
               <span>Tally: <b style={{ color: b.tally_check.startsWith('Changed') ? 'var(--red)' : undefined }}>{b.tally_check}</b></span>
               {b.final_longitude !== b.longitude && <span>Coordinates corrected: {b.final_longitude}, {b.final_latitude}</span>}
             </div>
             {data.bflags[b.building_id] && <div className="flags">{data.bflags[b.building_id]}</div>}
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
-            {isDE && open !== `b:${b.building_id}` && (
-              <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setOpen(`b:${b.building_id}`)}>{b.status ? 'Change status' : 'Give status'}</button></div>
+            <SchoolUpdate u={data.updates[`b:${b.building_id}`]} rec={b} kind="building" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
+            {canEdit && open !== `b:${b.building_id}` && (
+              <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setOpen(`b:${b.building_id}`)}>{isSchool ? 'Update' : b.status ? 'Change status' : 'Give status'}</button></div>
             )}
             {open === `b:${b.building_id}` && (
-              <StepForm kind="building" rec={b} lists={lists} db={db} onDone={done} onFail={fail} onCancel={() => setOpen(null)} />
+              <StepForm kind="building" rec={b} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} />
             )}
 
             <div className="scroll">
@@ -126,18 +136,19 @@ export default function School({ db, me, schoolId }) {
                     <React.Fragment key={r.room_id}>
                       <tr className={r.needs_room_decision ? 'red' : ''}>
                         <td>{r.room_no}<div className="mono muted">{r.room_code ?? 'no code'}</div></td>
-                        <td data-label="Condition">{r.final_condition ?? '—'}{r.final_condition !== r.room_condition && <div className="co small">CO: {r.room_condition ?? 'blank'}</div>}</td>
-                        <td data-label="Usage">{r.final_usage ?? '—'}{r.final_usage !== r.room_usage && <div className="co small">CO: {r.room_usage ?? 'blank'}</div>}</td>
+                        <td data-label="Condition">{r.final_condition ?? '—'}{r.final_condition !== r.room_condition && <div className="co small">NSBI: {r.room_condition ?? 'blank'}</div>}</td>
+                        <td data-label="Usage">{r.final_usage ?? '—'}{r.final_usage !== r.room_usage && <div className="co small">NSBI: {r.room_usage ?? 'blank'}</div>}</td>
                         <td data-label="Actual usage">{(r.final_actual_usages || []).join(', ')}
                           {data.rflags[r.room_id] && <div className="flags">{data.rflags[r.room_id]}</div>}
                           {r.needs_room_decision && <div className="small" style={{ color: 'var(--red)' }}>The building is for deletion: decide this room too.</div>}
                           {r.remarks && <div className="small"><b>Remarks:</b> {r.remarks}</div>}
+                          <SchoolUpdate u={data.updates[`r:${r.room_id}`]} rec={r} kind="room" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
                         </td>
                         <td data-label="Status"><StatusChip status={r.status} /></td>
-                        <td>{isDE && open !== `r:${r.room_id}` && <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{r.status ? 'Change' : 'Status'}</button>}</td>
+                        <td>{canEdit && open !== `r:${r.room_id}` && <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{isSchool ? 'Update' : r.status ? 'Change' : 'Status'}</button>}</td>
                       </tr>
                       {open === `r:${r.room_id}` && (
-                        <tr><td colSpan={6}><StepForm kind="room" rec={r} lists={lists} db={db} onDone={done} onFail={fail} onCancel={() => setOpen(null)} /></td></tr>
+                        <tr><td colSpan={6}><StepForm kind="room" rec={r} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} /></td></tr>
                       )}
                     </React.Fragment>
                   ))}
@@ -145,22 +156,22 @@ export default function School({ db, me, schoolId }) {
                 </tbody>
               </table>
             </div>
-            {isDE && <NewRoomForm db={db} lists={lists} building={b.building_id} onDone={done} onFail={fail} />}
+            {canEdit && <NewRoomForm db={db} lists={lists} building={b.building_id} onDone={done} onFail={fail} />}
           </section>
         );
       })}
 
       {data.newBuildings.map((nb) => (
         <section key={`nb${nb.id}`} className="card">
-          <div className="bldg-head"><h2>New building {nb.building_no}</h2><span className="chip blue">Missing from CO file</span></div>
+          <div className="bldg-head"><h2>New building {nb.building_no}</h2><span className="chip blue">{nb.by_school ? 'Added by the school' : 'Not in the NSBI'}</span></div>
           <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span></div>
           <div className="small"><b>Remarks:</b> {nb.remarks}</div>
           <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
-          {isDE && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} onDone={done} onFail={fail} />}
+          {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} onDone={done} onFail={fail} />}
         </section>
       ))}
 
-      {isDE && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
+      {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
       <OtherNsbiData db={db} schoolId={schoolId} />
       {(isDPO || me.role === 'ro') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
     </main>
@@ -173,13 +184,13 @@ function NewRoomRow({ r }) {
       <td>{r.room_no ?? 'new'}<div className="muted small">new room</div></td>
       <td data-label="Condition">{r.room_condition}</td><td data-label="Usage">{r.room_usage}</td>
       <td data-label="Actual usage">{r.actual_usages.join(', ')}<div className="small"><b>Remarks:</b> {r.remarks}</div></td>
-      <td data-label="Status"><span className="chip blue">Missing from CO file</span></td><td />
+      <td data-label="Status"><span className="chip blue">{r.by_school ? 'Added by the school' : 'Not in the NSBI'}</span></td><td />
     </tr>
   );
 }
 
-// The DE's step on one building or room. Corrections are written beside the CO value.
-function StepForm({ kind, rec, lists, db, onDone, onFail, onCancel }) {
+// The step on one building or room. Corrections are written beside the NSBI value.
+function StepForm({ kind, rec, lists, db, isSchool, onDone, onFail, onCancel }) {
   const [status, setStatus] = useState(rec.status ?? 'correct');
   const [f, setF] = useState({ condition: '', usage: '', actual: [], lon: '', lat: '', reason: '', remarks: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -189,7 +200,7 @@ function StepForm({ kind, rec, lists, db, onDone, onFail, onCancel }) {
     e.preventDefault();
     setBusy(true);
     const corr = status === 'corrected';
-    const common = { p_seen: rec.last_validation_id, p_status: status,
+    const common = { p_seen: rec.last_step_id, p_status: status,
       p_condition: corr && f.condition ? f.condition : null,
       p_reason: status === 'for_deletion' && f.reason ? f.reason : null, p_remarks: f.remarks || null };
     const { error } = kind === 'building'
@@ -198,13 +209,13 @@ function StepForm({ kind, rec, lists, db, onDone, onFail, onCancel }) {
       : await db.rpc('record_room_validation', { ...common, p_room: rec.room_id,
         p_usage: corr && f.usage ? f.usage : null, p_actual_usages: corr && f.actual.length ? f.actual : null });
     setBusy(false);
-    if (error) onFail(error); else onDone(`${kind === 'building' ? 'Building' : 'Room'} saved.`);
+    if (error) onFail(error); else onDone(isSchool ? 'Update sent to the Division Engineer.' : `${kind === 'building' ? 'Building' : 'Room'} saved.`);
   }
 
   return (
     <form className="step" onSubmit={save}>
       <fieldset className="choices">
-        <legend>Validation status</legend>
+        <legend>{isSchool ? 'Your update' : 'Validation status'}</legend>
         {[['correct', 'Correct as is'], ['corrected', 'With correction'], ['for_deletion', 'For deletion']].map(([v, label]) => (
           <label key={v}><input type="radio" name="status" checked={status === v} onChange={() => setStatus(v)} />{label}</label>
         ))}
@@ -213,7 +224,7 @@ function StepForm({ kind, rec, lists, db, onDone, onFail, onCancel }) {
         <div className="grid">
           <label className="f">Validated condition (only if different)
             <select value={f.condition} onChange={set('condition')}>
-              <option value="">Same as CO</option>
+              <option value="">Same as NSBI</option>
               {(kind === 'building' ? lists.bcond : lists.rcond).map((c) => <option key={c.name}>{c.name}</option>)}
             </select>
           </label>
@@ -226,7 +237,7 @@ function StepForm({ kind, rec, lists, db, onDone, onFail, onCancel }) {
             <>
               <label className="f">Validated room usage (only if different)
                 <select value={f.usage} onChange={set('usage')}>
-                  <option value="">Same as CO</option>
+                  <option value="">Same as NSBI</option>
                   {lists.usage.map((u) => <option key={u.name}>{u.name}</option>)}
                 </select>
               </label>
@@ -263,7 +274,7 @@ function NewRoomForm({ db, lists, building, newBuilding, onDone, onFail }) {
   const [show, setShow] = useState(false);
   const [f, setF] = useState({ no: '', condition: '', usage: '', actual: [], remarks: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  if (!show) return <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setShow(true)}>Add a room missing from CO's file</button></div>;
+  if (!show) return <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setShow(true)}>Add a room not in the NSBI</button></div>;
   async function save(e) {
     e.preventDefault();
     const { error } = await db.rpc('add_new_room', { p_building: building ?? null, p_new_building: newBuilding ?? null,
@@ -272,7 +283,7 @@ function NewRoomForm({ db, lists, building, newBuilding, onDone, onFail }) {
   }
   return (
     <form className="step" onSubmit={save}>
-      <h3>New room (the code stays blank; CO assigns it)</h3>
+      <h3>New room (the room code stays blank until assigned in the NSBI)</h3>
       <div className="grid">
         <label className="f">Room no.<input inputMode="numeric" value={f.no} onChange={set('no')} /></label>
         <label className="f">Condition<select required value={f.condition} onChange={set('condition')}><option value="">Choose…</option>{lists.rcond.map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
@@ -283,7 +294,7 @@ function NewRoomForm({ db, lists, building, newBuilding, onDone, onFail }) {
           </select>
         </label>
       </div>
-      <label className="f">Remarks: why it is missing from CO's file<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
+      <label className="f">Remarks: why it is not in the NSBI<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
       <div className="btns"><button type="submit" className="btn sm">Add room</button><button type="button" className="btn sm secondary" onClick={() => setShow(false)}>Cancel</button></div>
     </form>
   );
@@ -293,7 +304,7 @@ function NewBuildingForm({ db, lists, schoolId, onDone, onFail }) {
   const [show, setShow] = useState(false);
   const [f, setF] = useState({ no: '', type: '', condition: '', storeys: '', year: '', remarks: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  if (!show) return <div className="btns"><button type="button" className="btn secondary" onClick={() => setShow(true)}>Add a building missing from CO's file</button></div>;
+  if (!show) return <div className="btns"><button type="button" className="btn secondary" onClick={() => setShow(true)}>Add a building not in the NSBI</button></div>;
   async function save(e) {
     e.preventDefault();
     const { error } = await db.rpc('add_new_building', { p_cycle: CYCLE, p_school: schoolId, p_building_no: Number(f.no),
@@ -302,7 +313,7 @@ function NewBuildingForm({ db, lists, schoolId, onDone, onFail }) {
   }
   return (
     <form className="card" onSubmit={save}>
-      <h2>New building (the code stays blank; CO assigns it)</h2>
+      <h2>New building (the building code stays blank until assigned in the NSBI)</h2>
       <div className="grid">
         <label className="f">Building no. on site<input required inputMode="numeric" value={f.no} onChange={set('no')} /></label>
         <label className="f">Building type<input value={f.type} onChange={set('type')} /></label>
@@ -310,7 +321,7 @@ function NewBuildingForm({ db, lists, schoolId, onDone, onFail }) {
         <label className="f">Storeys<input inputMode="numeric" value={f.storeys} onChange={set('storeys')} /></label>
         <label className="f">Year completed<input inputMode="numeric" value={f.year} onChange={set('year')} /></label>
       </div>
-      <label className="f">Remarks: why it is missing from CO's file<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
+      <label className="f">Remarks: why it is not in the NSBI<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
       <div className="btns"><button type="submit" className="btn">Add building</button><button type="button" className="btn secondary" onClick={() => setShow(false)}>Cancel</button></div>
     </form>
   );
@@ -339,5 +350,42 @@ function DpoCheck({ db, schoolId, openItems, canAct, onDone, onFail }) {
         </>
       )}
     </section>
+  );
+}
+
+// A school's update waiting beside the record. The DE or DPO accepts it by recording the same step,
+// or answers with their own step through the usual form.
+function SchoolUpdate({ u, rec, kind, isSchool, canAccept, db, onDone, onFail }) {
+  const [busy, setBusy] = useState(false);
+  if (!u) return null;
+  const parts = [
+    u.validated_condition && `condition ${u.validated_condition}`,
+    u.validated_usage && `usage ${u.validated_usage}`,
+    u.validated_actual_usages?.length && `actual usage ${u.validated_actual_usages.join(', ')}`,
+    u.correct_longitude != null && `coordinates ${u.correct_longitude}, ${u.correct_latitude}`,
+    u.deletion_reason && `reason: ${u.deletion_reason}`,
+  ].filter(Boolean);
+  async function accept() {
+    setBusy(true);
+    const common = { p_seen: rec.last_step_id, p_status: u.status, p_condition: u.validated_condition,
+      p_reason: u.deletion_reason, p_remarks: u.remarks };
+    const { error } = kind === 'building'
+      ? await db.rpc('record_building_validation', { ...common, p_building: rec.building_id,
+        p_longitude: u.correct_longitude, p_latitude: u.correct_latitude })
+      : await db.rpc('record_room_validation', { ...common, p_room: rec.room_id,
+        p_usage: u.validated_usage, p_actual_usages: u.validated_actual_usages });
+    setBusy(false);
+    if (error) onFail(error); else onDone('School update accepted.');
+  }
+  return (
+    <div className="notice info small">
+      <b>{isSchool ? 'Your update, waiting for the Division Engineer:' : 'Update from the school:'}</b>{' '}
+      {STATUS[u.status].label}{parts.length > 0 && ` · ${parts.join(' · ')}`}{u.remarks && ` · "${u.remarks}"`}
+      {canAccept && (
+        <div className="btns" style={{ marginTop: 8 }}>
+          <button type="button" className="btn sm" disabled={busy} onClick={accept}>{busy ? 'Saving…' : 'Accept'}</button>
+        </div>
+      )}
+    </div>
   );
 }

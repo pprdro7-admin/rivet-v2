@@ -13,6 +13,7 @@ language sql as $$
     when 'dpo_cbu' then '4'
     when 'ro'      then '5'   -- Regional Office (PPRD)
     when 'admin'   then '6'
+    when 'school'  then '7'   -- the account of school 900001 (Bohol)
   end), false)
 $$;
 
