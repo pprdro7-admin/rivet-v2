@@ -34,7 +34,9 @@ export async function getClient() {
   if (client) return client;
   if (!isLocal) {
     // PKCE returns from Google with ?code=, which leaves the #/ screen addresses alone.
-    client = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+    // Only the address's origin: a URL copied with /rest/v1/ on the end sends sign-in to the wrong place.
+    const url = new URL(import.meta.env.VITE_SUPABASE_URL.trim()).origin;
+    client = createClient(url, import.meta.env.VITE_SUPABASE_ANON_KEY.trim(), {
       auth: { flowType: 'pkce' },
     });
     return client;
