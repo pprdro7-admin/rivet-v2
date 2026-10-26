@@ -203,6 +203,42 @@ function NewRoomRow({ r }) {
 const locks = (list, name) => !!list.find((c) => c.name === name)?.locks_usage;
 const LOCK_NOTE = 'Usage is locked: the room or its building is condemned or under construction, so no usage is entered.';
 
+// What the database would refuse, said before Save so the button never seems to do nothing.
+// Mirrors record_building_validation and record_room_validation; the database still has the last word.
+function whyNot(kind, rec, status, f, locked, lists) {
+  const B = (t) => <b>{t}</b>;
+  if (kind === 'building') {
+    if (status === 'correct' && !rec.building_condition) {
+      return <>The NSBI left this building's condition blank, so it cannot be {B('Correct as is')}. Choose {B('With correction')} and give the condition.</>;
+    }
+    if (status === 'for_deletion' && rec.building_condition === 'Demolished') {
+      return <>A Demolished building is kept, not deleted: its condition already records it. Choose {B('Correct as is')}.</>;
+    }
+    if (status === 'corrected') {
+      if (!f.condition && !f.lon && !f.lat) return <>Give the corrected condition or coordinates, or choose {B('Correct as is')}.</>;
+      if (!f.lon !== !f.lat) return <>Give both the correct longitude and latitude.</>;
+    }
+    return null;
+  }
+  const usage = status === 'corrected' && !locked && f.usage ? f.usage : rec.room_usage;
+  const actual = status === 'corrected' && !locked && f.actual.length ? f.actual : (rec.actual_usages || []);
+  if (status === 'correct') {
+    if (!rec.room_condition) return <>The NSBI left this room's condition blank, so it cannot be {B('Correct as is')}. Choose {B('With correction')} and give the condition.</>;
+    if (!locked && (!rec.room_usage || actual.length === 0)) {
+      return <>The NSBI left the room usage or actual usage blank, so it cannot be {B('Correct as is')}. Choose {B('With correction')} and give them.</>;
+    }
+  }
+  if (status === 'corrected' && !f.condition && (locked || (!f.usage && f.actual.length === 0))) {
+    return <>Give the corrected value, or choose {B('Correct as is')}.</>;
+  }
+  if (status !== 'for_deletion' && !locked && usage === 'Instructional' && actual.includes('Not Currently Used')) {
+    return status === 'correct'
+      ? <>This room cannot be {B('Correct as is')}: the NSBI lists it as Instructional but Not Currently Used. Choose {B('With correction')} and set the room usage to Non-Instructional, or give the room's real current use.</>
+      : <>A room not currently used is Non-Instructional: set the room usage to Non-Instructional, or give its real current use.</>;
+  }
+  return null;
+}
+
 // The step on one building or room. Corrections are written beside the NSBI value.
 function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, onCancel }) {
   const [status, setStatus] = useState(rec.status ?? 'correct');
@@ -212,9 +248,10 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  // The NSBI says Instructional but Not Currently Used: the database refuses "Correct as is" for it.
-  const notUsed = kind === 'room' && !locked && rec.final_usage === 'Instructional'
-    && (rec.final_actual_usages || []).includes('Not Currently Used');
+  const block = whyNot(kind, rec, status, f, locked, lists);
+  const nsbiCondition = kind === 'building' ? rec.building_condition : rec.room_condition;
+  const needsRemarks = status === 'corrected'
+    || (status === 'for_deletion' && lists.reasons.find((r) => r.code === f.reason)?.needs_remarks);
 
   async function save(e) {
     e.preventDefault();
@@ -246,7 +283,7 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
           <label className="f">Validated condition (only if different)
             <select value={f.condition} onChange={set('condition')}>
               <option value="">Same as NSBI</option>
-              {(kind === 'building' ? lists.bcond : lists.rcond).map((c) => <option key={c.name}>{c.name}</option>)}
+              {(kind === 'building' ? lists.bcond : lists.rcond).filter((c) => c.name !== nsbiCondition).map((c) => <option key={c.name}>{c.name}</option>)}
             </select>
           </label>
           {kind === 'building' ? (
@@ -261,7 +298,7 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
               <label className="f">Validated room usage (only if different)
                 <select value={f.usage} onChange={set('usage')}>
                   <option value="">Same as NSBI</option>
-                  {lists.usage.map((u) => <option key={u.name}>{u.name}</option>)}
+                  {lists.usage.filter((u) => u.name !== rec.room_usage).map((u) => <option key={u.name}>{u.name}</option>)}
                 </select>
               </label>
               <label className="f">Validated actual usage (only if different; Ctrl-click for several)
@@ -282,17 +319,12 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
           </select>
         </label>
       )}
-      {notUsed && status === 'correct' && (
-        <div className="notice warn small"><span>
-          This room cannot be <b>Correct as is</b>: the NSBI lists it as Instructional but Not Currently Used.
-          Choose <b>With correction</b> and set the room usage to Non-Instructional, or give the room's real current use.
-        </span></div>
-      )}
+      {block && <div className="notice warn small"><span>{block}</span></div>}
       {status !== 'correct' && (
-        <label className="f">Remarks{status === 'corrected' ? ' (required)' : ''}<textarea rows={2} value={f.remarks} onChange={set('remarks')} /></label>
+        <label className="f">Remarks{needsRemarks ? ' (required)' : ''}<textarea rows={2} required={!!needsRemarks} value={f.remarks} onChange={set('remarks')} /></label>
       )}
       <div className="btns">
-        <button type="submit" className="btn sm" disabled={busy || (notUsed && status === 'correct')}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="submit" className="btn sm" disabled={busy || !!block}>{busy ? 'Saving…' : 'Save'}</button>
         <button type="button" className="btn sm secondary" onClick={onCancel}>Cancel</button>
       </div>
       {err && <ErrorNote error={err} />}
@@ -327,8 +359,11 @@ function NewRoomForm({ db, lists, building, newBuilding, bldgLocked, onDone, onF
         </label>
         </>}
       </div>
+      {!locked && f.usage === 'Instructional' && f.actual.includes('Not Currently Used') && (
+        <div className="notice warn small"><span>A room not currently used is Non-Instructional: change the room usage, or give its real current use.</span></div>
+      )}
       <label className="f">Remarks: why it is not in the NSBI<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
-      <div className="btns"><button type="submit" className="btn sm">Add room</button><button type="button" className="btn sm secondary" onClick={() => setShow(false)}>Cancel</button></div>
+      <div className="btns"><button type="submit" className="btn sm" disabled={!locked && f.usage === 'Instructional' && f.actual.includes('Not Currently Used')}>Add room</button><button type="button" className="btn sm secondary" onClick={() => setShow(false)}>Cancel</button></div>
     </form>
   );
 }
