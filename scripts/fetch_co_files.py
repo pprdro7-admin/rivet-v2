@@ -2,11 +2,15 @@
 """Download CO's xlsx files from a private Supabase Storage bucket.
 
     DATABASE_URL=... SUPABASE_SECRET_KEY=... python3 scripts/fetch_co_files.py BUCKET FILE [FILE...] OUTDIR
+    DATABASE_URL=... SUPABASE_SECRET_KEY=... python3 scripts/fetch_co_files.py BUCKET FOLDER/ OUTDIR
+
+A name ending in / is a folder in the bucket: every .xlsx file in it is downloaded.
 
 The project is worked out from DATABASE_URL (the pooler user is postgres.<project ref>, a direct
 connection's host is db.<project ref>.supabase.co), so the only extra secret is the key.
 """
 
+import json
 import os
 import sys
 import urllib.parse
@@ -36,14 +40,27 @@ def main():
     if key.startswith("eyJ"):  # legacy service_role key, a JWT
         headers["Authorization"] = f"Bearer {key}"
     os.makedirs(outdir, exist_ok=True)
+    names = []
     for name in files:
+        if not name.endswith("/"):
+            names.append(name)
+            continue
+        req = urllib.request.Request(f"{base}/list/{urllib.parse.quote(bucket)}", method="POST",
+                                     data=json.dumps({"prefix": name, "limit": 1000}).encode(),
+                                     headers={**headers, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req) as r:
+            found = [name + o["name"] for o in json.load(r) if o["name"].lower().endswith(".xlsx")]
+        if not found:
+            sys.exit(f"No .xlsx files in folder {name} of bucket {bucket}")
+        names += found
+    for name in names:
         url = f"{base}/{urllib.parse.quote(bucket)}/{urllib.parse.quote(name)}"
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as r:
                 data = r.read()
         except urllib.error.HTTPError as e:
             sys.exit(f"Could not download {name} from bucket {bucket}: HTTP {e.code} {e.read()[:200]!r}")
-        with open(os.path.join(outdir, name), "wb") as f:
+        with open(os.path.join(outdir, os.path.basename(name)), "wb") as f:
             f.write(data)
         print(f"{name}: {len(data):,} bytes")
 

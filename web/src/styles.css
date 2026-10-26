@@ -238,6 +238,7 @@ label.check { display: inline-flex; gap: 8px; align-items: center; }
 .report-table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted, #5b6b7f); }
 .report-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .report-table tfoot td { font-weight: 700; border-top: 2px solid var(--ink, #1a2433); }
+.report-table td:first-child { white-space: nowrap; }
 @media print {
   .devbar, .official, .topbar, .noprint, .reports > h1 { display: none !important; }
   body { background: #fff; }

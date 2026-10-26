@@ -16,7 +16,7 @@ export default function Inventory({ db, me }) {
 
   useEffect(() => {
     Promise.all([
-      fetchAll(() => db.from('report_facilities').select('*').eq('cycle_id', CYCLE).order('school_name')),
+      fetchAll(() => db.from('report_facilities').select('*').eq('cycle_id', CYCLE).order('school_name').order('school_id')),
       db.from('sdos').select('code, name').order('name'),
     ]).then(([r, s]) => { setRows(r); setSdos(s.data ?? []); }, setError);
   }, [db]);

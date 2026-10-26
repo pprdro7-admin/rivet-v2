@@ -26,19 +26,22 @@ export default function Dashboard({ db, me }) {
   }, [db]);
 
   useEffect(() => {
-    if (!year) return;
+    if (!year) return undefined;
+    let live = true; // the year changed while the last one was loading: drop the older answer
     setData(null);
     const scoped = (q) => (sdo ? q.eq('sdo_code', sdo) : q);
     Promise.all([
-      fetchAll(() => scoped(db.from('dash_conditions').select('*').eq('cycle_id', year))),
-      fetchAll(() => scoped(db.from('dash_room_usage').select('*').eq('cycle_id', year))),
-      fetchAll(() => scoped(db.from('dash_school_totals').select('*').eq('cycle_id', year))),
+      fetchAll(() => scoped(db.from('dash_conditions').select('*').eq('cycle_id', year).order('sdo_code').order('kind').order('condition'))),
+      fetchAll(() => scoped(db.from('dash_room_usage').select('*').eq('cycle_id', year).order('sdo_code').order('usage'))),
+      fetchAll(() => scoped(db.from('dash_school_totals').select('*').eq('cycle_id', year).order('sdo_code').order('co_table').order('measure'))),
       scoped(db.from('sdo_progress').select('*').eq('cycle_id', year)),
-      fetchAll(() => scoped(db.from('classroom_gap').select('*').eq('cycle_id', year))),
+      fetchAll(() => scoped(db.from('classroom_gap').select('*').eq('cycle_id', year).order('school_id'))),
     ]).then(([c, u, s, p, g]) => {
+      if (!live) return;
       if (p.error) { setError(p.error); return; }
       setData({ cond: c, usage: u, totals: s, progress: p.data, gap: g });
-    }).catch(setError);
+    }).catch((e) => { if (live) setError(e); });
+    return () => { live = false; };
   }, [db, year, sdo]);
 
   const y = years?.find((r) => r.cycle_id === year);
@@ -179,14 +182,21 @@ function Legend({ a = 'NSBI', b = 'Validated' }) {
 // SY 2024-2025 and other years with school-level tables only.
 function SchoolTablesView({ data, label }) {
   const t = {};
-  // Tables 4 and 5 repeat the enrollment columns: read each figure from its own table only.
+  // Tables 4 and 5 repeat the enrollment columns: read each figure from its own table only, and
+  // learners from the classroom summary, or from the first other table that has them (CO's
+  // SY 2023-2024 classroom summary has none).
   const FROM = { T3: /^(tls|makeshift)_/, T5: /^total_seat_/, CLS: /^(enrollment|instructional_rooms|noninstructional_rooms)_/ };
   data.totals.forEach((x) => { if (FROM[x.co_table]?.test(x.measure)) t[x.measure] = (t[x.measure] ?? 0) + Number(x.total); });
+  const learnersFrom = ['CLS', 'T3', 'T4', 'T5', 'BLD'].find((tb) => data.totals.some((x) => x.co_table === tb && x.measure.startsWith('enrollment_')));
+  if (learnersFrom && learnersFrom !== 'CLS') {
+    data.totals.forEach((x) => { if (x.co_table === learnersFrom && x.measure.startsWith('enrollment_')) t[x.measure] = (t[x.measure] ?? 0) + Number(x.total); });
+  }
   const w = (x) => n(Math.round(x));
   const has = data.totals.length > 0;
   if (!has) return <div className="notice info">The NSBI {label} school-level tables are not loaded yet.</div>;
   const lv = (base) => ['es', 'jhs', 'shs'].reduce((a, k) => a + (t[`${base}_${k}`] ?? 0), 0);
   const enrol = t.enrollment_k12 ?? lv('enrollment');
+  const got = (tb) => data.totals.some((x) => x.co_table === tb); // '—' for a table CO did not release that year
   const rooms = lv('instructional_rooms');
   const levels = [['Elementary', 'es'], ['Junior High', 'jhs'], ['Senior High', 'shs']];
   return (
@@ -195,10 +205,10 @@ function SchoolTablesView({ data, label }) {
       <div className="grid tiles">
         <Tile big={n(enrol)} text="learners enrolled" />
         <Tile big={w(rooms)} text="instructional rooms" />
-        <Tile big={rooms ? ratio(enrol / rooms) : '—'} text="learners per instructional room" />
-        <Tile big={n((t.tls_count_es ?? 0) + (t.tls_count_ss ?? 0))} text="temporary learning spaces" />
-        <Tile big={n((t.makeshift_count_es ?? 0) + (t.makeshift_count_ss ?? 0))} text="makeshift rooms" />
-        <Tile big={n(lv('total_seat'))} text="seats (Table 5)" />
+        <Tile big={rooms && enrol ? ratio(enrol / rooms) : '—'} text="learners per instructional room" />
+        <Tile big={got('T3') ? n((t.tls_count_es ?? 0) + (t.tls_count_ss ?? 0)) : '—'} text="temporary learning spaces" />
+        <Tile big={got('T3') ? n((t.makeshift_count_es ?? 0) + (t.makeshift_count_ss ?? 0)) : '—'} text="makeshift rooms" />
+        <Tile big={Object.keys(t).some((k) => k.startsWith('total_seat_')) ? n(lv('total_seat') + (t.total_seat_ss ?? 0)) : '—'} text="seats (Table 5)" />
       </div>
       <section className="card chart">
         <div className="spread"><h2>Instructional rooms and learners per room, by level</h2></div>
@@ -214,7 +224,7 @@ function SchoolTablesView({ data, label }) {
                     <td className="num" data-label="Learners">{n(e)}</td>
                     <td className="num" data-label="Instructional rooms">{w(ir)}</td>
                     <td className="num" data-label="Non-instructional rooms">{w(t[`noninstructional_rooms_${k}`] ?? 0)}</td>
-                    <td className="num" data-label="Learners per room">{ir ? ratio(e / ir) : '—'}</td>
+                    <td className="num" data-label="Learners per room">{ir && e ? ratio(e / ir) : '—'}</td>
                   </tr>
                 );
               })}
@@ -238,7 +248,7 @@ function Drill({ db, year, sdo, drill, onClose }) {
     fetchAll(() => {
       let q = db.from('dash_by_school').select('*').eq('cycle_id', year).eq('kind', drill.kind).eq('label', drill.label);
       if (sdo) q = q.eq('sdo_code', sdo);
-      return q.order('validated', { ascending: false }).order('nsbi', { ascending: false });
+      return q.order('validated', { ascending: false }).order('nsbi', { ascending: false }).order('school_id');
     }).then(setRows).catch(setErr);
   }, [db, year, sdo, drill]);
   useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [drill]);

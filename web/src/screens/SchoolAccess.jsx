@@ -39,7 +39,7 @@ export default function SchoolAccess({ db, me }) {
   useEffect(() => {
     load();
     fetchAll(() => db.from('cycle_schools').select('school_id, school_name, district').eq('cycle_id', CYCLE)
-      .eq('sdo_code', sdo).order('school_name')).then(setSchools, setError);
+      .eq('sdo_code', sdo).order('school_name').order('school_id')).then(setSchools, setError);
   }, [db, sdo, load]);
 
   const active = useMemo(() => (list ?? []).filter((g) => !g.removed_at), [list]);

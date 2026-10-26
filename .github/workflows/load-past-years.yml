@@ -1,0 +1,57 @@
+name: Load earlier school years
+
+# Loads CO's school-level NSBI tables and LIS enrollment for earlier school years, read-only, so the
+# reports can go back year by year. Put the xlsx files in one folder of the private Storage bucket
+# "co-files" (never in this repository) and give the folder name. Each file is recognised by its name:
+#   - "Enrollment" in the name: LIS school-level enrollment; the school year is read from the name.
+#   - any other: a CO table (buildings by condition, classrooms, TLS, WATSAN, furniture, other
+#     facilities, access going to school) for the school year in its name (SY 2022-2023 onwards).
+# A file whose Region column is not Region VII stops the load. A table or enrollment year already
+# loaded is refused, so run each folder once.
+on:
+  workflow_dispatch:
+    inputs:
+      folder:
+        description: 'Folder in the co-files bucket'
+        default: 'past-years'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: validation
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      FOLDER: ${{ inputs.folder }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5
+      - name: Download the files from Storage
+        run: python3 scripts/fetch_co_files.py co-files "${FOLDER%/}/" downloads
+      - name: Load LIS enrollment
+        run: |
+          shopt -s nullglob nocaseglob
+          for f in downloads/*enrollment*.xlsx; do python3 scripts/load_enrollment.py auto "$f"; done
+      - name: Load CO's tables, one school year at a time
+        run: |
+          shopt -s nullglob
+          for f in downloads/*.xlsx; do
+            [[ "${f,,}" == *enrollment* ]] && continue
+            [[ "$f" =~ SY\ ?([0-9]{4})-([0-9]{4}) ]] || { echo "No school year in the name: $f"; exit 1; }
+            echo "SY${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+          done | sort -u | while read -r year; do
+            files=()
+            for f in downloads/*.xlsx; do
+              [[ "${f,,}" == *enrollment* ]] && continue
+              [[ "$f" =~ SY\ ?([0-9]{4})-([0-9]{4}) ]] && [[ "SY${BASH_REMATCH[1]}-${BASH_REMATCH[2]}" == "$year" ]] && files+=("$f")
+            done
+            python3 scripts/load_co_past_years.py "$year" "${files[@]}"
+          done
+      - name: Count what was loaded
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -c "select cycle_id, co_table, count(*) as schools from co_school_records group by 1, 2 order by 1, 2;" \
+            -c "select school_year, count(*) as schools from enrollments group by 1 order by 1;"

@@ -24,7 +24,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
   useEffect(() => {
     setRows(null);
     fetchAll(() => db.from('school_tally').select('*').eq('cycle_id', CYCLE).eq('sdo_code', sdoCode)
-      .order('flagged_rooms', { ascending: false }).order('school_name'))
+      .order('flagged_rooms', { ascending: false }).order('school_name').order('school_id'))
       .then(setRows, setError);
     db.from('return_status').select('school_id, state').eq('cycle_id', CYCLE).eq('kind', 'de_to_school')
       .eq('sdo_code', sdoCode).neq('state', 'closed')

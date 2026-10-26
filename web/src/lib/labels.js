@@ -23,7 +23,7 @@ export function pct(share) {
 }
 
 export function n(x) {
-  return Number(x || 0).toLocaleString('en-PH');
+  return Math.round(Number(x || 0)).toLocaleString('en-PH');
 }
 
 // The database's refusal, as the person should read it.
