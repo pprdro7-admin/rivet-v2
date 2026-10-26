@@ -7,6 +7,8 @@ import SchoolTally from './screens/SchoolTally.jsx';
 import RegionProgress from './screens/RegionProgress.jsx';
 import School from './screens/School.jsx';
 import SchoolAccess from './screens/SchoolAccess.jsx';
+import Reports from './screens/Reports.jsx';
+import Inventory from './screens/Inventory.jsx';
 import { REGION_ROLES } from './lib/labels.js';
 
 function useRoute() {
@@ -61,6 +63,8 @@ export default function App() {
   else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
   else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;
+  else if (route === '#/reports') page = <Reports db={db} me={me} />;
+  else if (route === '#/inventory') page = <Inventory db={db} me={me} />;
   else if (route === '#/access' && me.role === 'dpo') page = <SchoolAccess db={db} me={me} />;
   else if (route.startsWith('#/sdo/')) page = <SchoolTally db={db} me={me} sdoCode={route.slice('#/sdo/'.length)} />;
   else if (REGION_ROLES.includes(me.role)) page = <RegionProgress db={db} me={me} />;

@@ -45,7 +45,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
   return (
     <main className="page">
       <div className="spread">
-        <h1>School Tally{me.sdo_code ? '' : ` · ${sdoCode}`}</h1>
+        <h1>Validation{me.sdo_code ? "" : ` · ${sdoCode}`}</h1>
         <span className="muted">{n(done)} of {n(rows.length)} schools complete</span>
       </div>
       <p className="muted" style={{ margin: 0 }}>

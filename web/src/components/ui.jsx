@@ -1,5 +1,5 @@
 import React from 'react';
-import { STATUS, ROLE, REGION_ROLES } from '../lib/labels.js';
+import { STATUS, ROLE } from '../lib/labels.js';
 import { isLocal, isProduction } from '../lib/supabase.js';
 
 export function go(path) {
@@ -39,8 +39,10 @@ export function Header({ me, route, onSignOut }) {
         <div className="topbar-in">
           <a className="brand" href="#/home"><b>RIVET</b><span>{office}</span></a>
           <nav className="nav">
-            {me && <a href="#/home" className={route === '#/dashboard' || route === '#/access' ? '' : 'on'}>{REGION_ROLES.includes(me.role) ? 'Region VII progress' : me.role === 'school' ? 'My school' : 'School Tally'}</a>}
+            {me && <a href="#/home" className={['#/dashboard', '#/access', '#/reports', '#/inventory'].includes(route) ? '' : 'on'}>{me.role === 'school' ? 'My school' : 'Validation'}</a>}
+            {me && me.role !== 'school' && <a href="#/inventory" className={route === '#/inventory' ? 'on' : ''}>Inventory</a>}
             {me && me.role !== 'school' && <a href="#/dashboard" className={route === '#/dashboard' ? 'on' : ''}>Dashboard</a>}
+            {me && me.role !== 'school' && <a href="#/reports" className={route === '#/reports' ? 'on' : ''}>Reports</a>}
             {me && me.role === 'dpo' && <a href="#/access" className={route === '#/access' ? 'on' : ''}>School access</a>}
           </nav>
           {me && (

@@ -32,9 +32,12 @@ export function problem(error) {
   return error.message || String(error);
 }
 
-// Learners per room as a ratio, rounded to a whole learner: 1:36.
+// Learners per room as a ratio, rounded to a whole learner: 1:36. Small ratios (learners per seat)
+// keep one decimal, 1:1.3, so they do not all read 1:1.
 export function ratio(x) {
-  return x === null || x === undefined ? '' : `1:${Math.round(Number(x))}`;
+  if (x === null || x === undefined) return '';
+  const v = Number(x);
+  return v < 10 ? `1:${v.toFixed(1)}` : `1:${Math.round(v)}`;
 }
 
 // Roles that see the whole region.

@@ -78,7 +78,7 @@ export default function School({ db, me, schoolId }) {
 
   return (
     <main className="page">
-      {!isSchool && <a href={`#/sdo/${t.sdo_code}`} className="small">← School Tally</a>}
+      {!isSchool && <a href={`#/sdo/${t.sdo_code}`} className="small">← Validation</a>}
       <div className="spread">
         <div><h1>{t.school_name}</h1><span className="mono muted">{t.school_id} · {t.district}</span><div className="small muted">{SOURCE}, with the SDO's validation</div></div>
         {t.dpo_complete ? <span className="chip green">Complete</span>
