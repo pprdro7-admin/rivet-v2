@@ -98,12 +98,22 @@ def level_of(text):
     return None
 
 
-def table_of(path):
+def table_of(path, strict=True):
     name = os.path.basename(path).upper()
     for code, pat in TABLES:
         if re.search(pat, name):
             return code
-    sys.exit(f"Cannot tell which NSBI table {os.path.basename(path)} is")
+    if strict:
+        sys.exit(f"Cannot tell which NSBI table {os.path.basename(path)} is")
+    return None
+
+
+def loaded_tables(cycle):
+    """Tables already loaded for this cycle, so a second run of the workflow passes over them."""
+    out = subprocess.run(["psql", os.environ["DATABASE_URL"], "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+                          "-c", f"select co_table from source_loads where cycle_id = '{cycle.replace(chr(39), '')}'"],
+                         check=True, capture_output=True, text=True).stdout
+    return set(out.split())
 
 
 def text(v):
@@ -294,16 +304,27 @@ def main():
     if len(sys.argv) < 3 or "DATABASE_URL" not in os.environ:
         sys.exit(__doc__)
     cycle, files = sys.argv[1], sys.argv[2:]
+    done = loaded_tables(cycle)
     with tempfile.TemporaryDirectory() as tmp:
         script = []
         for path in files:
-            code = table_of(path)
+            code = table_of(path, strict=False)
+            if code is None:
+                print(f"Skipped {os.path.basename(path)}: not one of the NSBI tables this loader reads")
+                continue
+            if code in done:
+                print(f"Skipped {os.path.basename(path)}: {code} is already loaded for {cycle}")
+                continue
+            done.add(code)
             staged = os.path.join(tmp, f"{code}.csv")
             with open(staged, "w", newline="", encoding="utf-8") as out:
                 stage(code, path, out)
             name = os.path.basename(path).replace("'", "''")
             script.append(f"\\copy co_staging (co_table, source_row, rec) from '{staged}' with (format csv)")
             script.append(f"select load_co_school_table('{cycle}', '{code}', '{name}', '{sha256(path)}');")
+        if not script:
+            print(f"{cycle}: nothing new to load.")
+            return
         subprocess.run(["psql", os.environ["DATABASE_URL"], "-X", "-q", "-v", "ON_ERROR_STOP=1", "-c", "begin;"]
                        + sum((["-c", s] for s in script), []) + ["-c", "commit;"], check=True)
     print("Loaded.")

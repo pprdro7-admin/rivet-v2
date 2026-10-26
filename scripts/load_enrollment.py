@@ -133,6 +133,15 @@ def main():
         year, source, path = sys.argv[1:]
     else:
         sys.exit(__doc__)
+    sha = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    if sys.argv[1] == "auto":
+        # A second run of the workflow passes over files already loaded.
+        seen = subprocess.run(["psql", os.environ["DATABASE_URL"], "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+                               "-c", f"select school_year from enrollment_loads where file_sha256 = '{sha}'"],
+                              check=True, capture_output=True, text=True).stdout.split()
+        if seen:
+            print(f"Skipped {os.path.basename(path)}: already loaded for {seen[0]}")
+            return
     rows, cols, need, hr, _ = read(path)
     if sys.argv[1] == "auto":
         line = next((str(r[0]) for r in rows[:5] if r and r[0] and "LIS" in str(r[0])), None)
@@ -146,7 +155,6 @@ def main():
             for i, rec in schools(rows, cols, need, hr):
                 w.writerow(["LIS", i, json.dumps(rec)])
                 n += 1
-        sha = hashlib.sha256(open(path, "rb").read()).hexdigest()
         name = os.path.basename(path).replace("'", "''")
         print(f"{year}: {n} public schools from {os.path.basename(path)} ({source})")
         subprocess.run(["psql", os.environ["DATABASE_URL"], "-X", "-q", "-v", "ON_ERROR_STOP=1",
