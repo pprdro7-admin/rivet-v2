@@ -56,7 +56,7 @@ export default function School({ db, me, schoolId }) {
   const canEdit = isSDO || isSchool;
   const isDPO = me.role === 'dpo' && me.sdo_code === t.sdo_code;
   const done = (msg) => { setNote({ ok: msg }); setOpen(null); load(); };
-  const fail = (e) => setNote({ err: problem(e) });
+  const fail = (e) => { setNote({ err: problem(e) }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   async function markRestCorrect() {
     const bs = data.buildings.filter((b) => !b.status && !data.bflags[b.building_id] && !data.updates[`b:${b.building_id}`]);
@@ -211,10 +211,15 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
     || locks(lists.rcond, status === 'corrected' && f.condition ? f.condition : rec.room_condition));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  // The NSBI says Instructional but Not Currently Used: the database refuses "Correct as is" for it.
+  const notUsed = kind === 'room' && !locked && rec.final_usage === 'Instructional'
+    && (rec.final_actual_usages || []).includes('Not Currently Used');
 
   async function save(e) {
     e.preventDefault();
     setBusy(true);
+    setErr(null);
     const corr = status === 'corrected';
     const common = { p_seen: rec.last_step_id, p_status: status,
       p_condition: corr && f.condition ? f.condition : null,
@@ -225,7 +230,7 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
       : await db.rpc('record_room_validation', { ...common, p_room: rec.room_id,
         p_usage: corr && !locked && f.usage ? f.usage : null, p_actual_usages: corr && !locked && f.actual.length ? f.actual : null });
     setBusy(false);
-    if (error) onFail(error); else onDone(isSchool ? 'Update sent to the Division Engineer.' : `${kind === 'building' ? 'Building' : 'Room'} saved.`);
+    if (error) setErr(problem(error)); else onDone(isSchool ? 'Update sent to the Division Engineer.' : `${kind === 'building' ? 'Building' : 'Room'} saved.`);
   }
 
   return (
@@ -277,13 +282,20 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
           </select>
         </label>
       )}
+      {notUsed && status === 'correct' && (
+        <div className="notice warn small"><span>
+          This room cannot be <b>Correct as is</b>: the NSBI lists it as Instructional but Not Currently Used.
+          Choose <b>With correction</b> and set the room usage to Non-Instructional, or give the room's real current use.
+        </span></div>
+      )}
       {status !== 'correct' && (
         <label className="f">Remarks{status === 'corrected' ? ' (required)' : ''}<textarea rows={2} value={f.remarks} onChange={set('remarks')} /></label>
       )}
       <div className="btns">
-        <button type="submit" className="btn sm" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="submit" className="btn sm" disabled={busy || (notUsed && status === 'correct')}>{busy ? 'Saving…' : 'Save'}</button>
         <button type="button" className="btn sm secondary" onClick={onCancel}>Cancel</button>
       </div>
+      {err && <ErrorNote error={err} />}
     </form>
   );
 }
