@@ -62,7 +62,10 @@ export default function School({ db, me, schoolId }) {
 
   async function markRestCorrect() {
     const bs = data.buildings.filter((b) => !b.status && !data.bflags[b.building_id] && !data.updates[`b:${b.building_id}`]);
-    const rs = data.rooms.filter((r) => !r.status && !data.rflags[r.room_id] && !r.building_for_deletion && !data.updates[`r:${r.room_id}`]);
+    // A room takes a status only once its building has one (given before, or in this same pass).
+    const given = new Set([...data.buildings.filter((b) => b.status), ...bs].map((b) => b.building_id));
+    const rs = data.rooms.filter((r) => !r.status && !data.rflags[r.room_id] && !r.building_for_deletion && !data.updates[`r:${r.room_id}`]
+      && given.has(r.building_id));
     if (!window.confirm(`Mark ${bs.length} building(s) and ${rs.length} room(s) that have no status and no flag as Correct as is?`)) return;
     let count = 0;
     for (const b of bs) {
@@ -133,7 +136,8 @@ export default function School({ db, me, schoolId }) {
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
             <SchoolUpdate u={data.updates[`b:${b.building_id}`]} rec={b} rooms={rooms} kind="building" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
             {canEdit && open !== `b:${b.building_id}` && (
-              <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setOpen(`b:${b.building_id}`)}>{isSchool ? 'Update' : b.status ? 'Change status' : 'Give status'}</button></div>
+              <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setOpen(`b:${b.building_id}`)}>{isSchool ? 'Update' : b.status ? 'Change status' : 'Give status'}</button>
+                {!isSchool && !b.status && rooms.length > 0 && <span className="small muted">Give the building a status first, then its rooms.</span>}</div>
             )}
             {open === `b:${b.building_id}` && (
               <StepForm kind="building" rec={b} rooms={rooms} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} />
@@ -158,7 +162,9 @@ export default function School({ db, me, schoolId }) {
                           <SchoolUpdate u={data.updates[`r:${r.room_id}`]} rec={r} kind="room" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
                         </td>
                         <td data-label="Status"><StatusChip status={r.status} /></td>
-                        <td>{canEdit && open !== `r:${r.room_id}` && <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{isSchool ? 'Update' : r.status ? 'Change' : 'Status'}</button>}</td>
+                        <td>{canEdit && open !== `r:${r.room_id}` && (isSchool || b.status
+                          ? <button type="button" className="btn sm secondary" onClick={() => setOpen(`r:${r.room_id}`)}>{isSchool ? 'Update' : r.status ? 'Change' : 'Status'}</button>
+                          : <span className="small muted">Building first</span>)}</td>
                       </tr>
                       {open === `r:${r.room_id}` && (
                         <tr><td colSpan={6}><StepForm kind="room" rec={r} bldgLocked={bldgLocked} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} /></td></tr>

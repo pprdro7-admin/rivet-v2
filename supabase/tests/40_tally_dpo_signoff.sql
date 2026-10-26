@@ -1,5 +1,7 @@
 -- The tally, the DPO's check, the RO's sign-off and the validated baseline.
 begin;
+-- This file checks room rules alone; the building-first order has its own test (99g).
+alter table room_validations disable trigger room_validations_building_first;
 set role authenticated;
 select tests.login('de');
 

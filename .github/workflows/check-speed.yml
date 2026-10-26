@@ -1,0 +1,25 @@
+name: Check screen speed
+
+# Times the Validation list and the Reports start-up on the validation database, refreshes the
+# table statistics the planner uses, then times them again. Reads only; the log shows timings.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: validation
+    steps:
+      - uses: actions/checkout@v4
+      - name: Time the screens
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check_speed.sql 2>&1 | grep -E "NOTICE|ERROR"
+      - name: Refresh table statistics
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "analyze;"
+      - name: Time the screens again
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check_speed.sql 2>&1 | grep -E "NOTICE|ERROR"
