@@ -6,6 +6,19 @@ import { createClient } from '@supabase/supabase-js';
 //   (it needs an OAuth client from Google Cloud, which the DepEd Workspace has switched off for staff).
 // - On a laptop (scripts/dev.sh): the local database, where "signing in" means picking one of the
 //   sample accounts. The local server accepts tokens signed with a throwaway development secret.
+// A read that hits the database's time limit (often a cold or busy moment on the shared server)
+// is tried again, up to twice, before the screen shows the error. Saves are never repeated.
+async function patientFetch(input, init = {}) {
+  const method = (init.method || 'GET').toUpperCase();
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await fetch(input, init);
+    if (method !== 'GET' || res.status < 500 || attempt >= 2) return res;
+    const body = await res.clone().json().catch(() => null);
+    if (body?.code !== '57014') return res;
+    await new Promise((ok) => setTimeout(ok, 1000 * (attempt + 1)));
+  }
+}
+
 export const LOCAL_SECRET = import.meta.env.VITE_LOCAL_JWT_SECRET;
 export const isLocal = Boolean(LOCAL_SECRET);
 export const googleSignIn = import.meta.env.VITE_GOOGLE_SIGNIN === 'on';
@@ -38,6 +51,7 @@ export async function getClient() {
     const url = new URL(import.meta.env.VITE_SUPABASE_URL.trim()).origin;
     client = createClient(url, import.meta.env.VITE_SUPABASE_ANON_KEY.trim(), {
       auth: { flowType: 'pkce' },
+      global: { fetch: patientFetch },
     });
     return client;
   }
@@ -46,7 +60,7 @@ export async function getClient() {
   const headers = {};
   if (localUserId) headers.Authorization = `Bearer ${await localToken({ role: 'authenticated', sub: localUserId })}`;
   client = createClient(window.location.origin, anon, {
-    global: { headers },
+    global: { headers, fetch: patientFetch },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
   return client;
