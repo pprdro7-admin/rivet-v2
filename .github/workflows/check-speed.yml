@@ -23,3 +23,7 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check_speed.sql 2>&1 | grep -E "NOTICE|ERROR"
+      - name: Show how the Bohol list runs
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v sdo=BOH -f scripts/explain_tally.sql
