@@ -127,12 +127,12 @@ export default function School({ db, me, schoolId }) {
             {data.bflags[b.building_id] && <div className="flags">{data.bflags[b.building_id]}</div>}
             {data.sendBack.notes[`building:${b.building_id}`] && <div className="note-row small"><b>Sent back:</b> {data.sendBack.notes[`building:${b.building_id}`]}</div>}
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
-            <SchoolUpdate u={data.updates[`b:${b.building_id}`]} rec={b} kind="building" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
+            <SchoolUpdate u={data.updates[`b:${b.building_id}`]} rec={b} rooms={rooms} kind="building" isSchool={isSchool} canAccept={isSDO} db={db} lists={lists} onDone={done} onFail={fail} />
             {canEdit && open !== `b:${b.building_id}` && (
               <div className="btns"><button type="button" className="btn sm secondary" onClick={() => setOpen(`b:${b.building_id}`)}>{isSchool ? 'Update' : b.status ? 'Change status' : 'Give status'}</button></div>
             )}
             {open === `b:${b.building_id}` && (
-              <StepForm kind="building" rec={b} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} />
+              <StepForm kind="building" rec={b} rooms={rooms} lists={lists} db={db} isSchool={isSchool} onDone={done} onFail={fail} onCancel={() => setOpen(null)} />
             )}
 
             <div className="scroll">
@@ -203,6 +203,14 @@ function NewRoomRow({ r }) {
 const locks = (list, name) => !!list.find((c) => c.name === name)?.locks_usage;
 const LOCK_NOTE = 'Usage is locked: the room or its building is condemned or under construction, so no usage is entered.';
 
+// Deleting a building takes its rooms with it: the person confirms, seeing what goes.
+function confirmDeletion(b, rooms = []) {
+  const list = rooms.map((r) => `  Room ${r.room_no} (${r.room_code ?? 'no code'}), ${r.final_usage ?? 'usage blank'}`).join('\n');
+  return window.confirm(`Delete Building ${b.building_no} (${b.building_code}) from the validated record?\n\n`
+    + (rooms.length ? `Each of its ${rooms.length} room(s) then needs its own decision before the school can be complete:\n${list}\n\n` : 'It has no rooms listed.\n\n')
+    + 'The NSBI data is kept and the deletion can be changed until the RO signs off the SDO.');
+}
+
 // What the database would refuse, said before Save so the button never seems to do nothing.
 // Mirrors record_building_validation and record_room_validation; the database still has the last word.
 function whyNot(kind, rec, status, f, locked, lists) {
@@ -240,7 +248,7 @@ function whyNot(kind, rec, status, f, locked, lists) {
 }
 
 // The step on one building or room. Corrections are written beside the NSBI value.
-function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, onCancel }) {
+function StepForm({ kind, rec, rooms, bldgLocked, lists, db, isSchool, onDone, onFail, onCancel }) {
   const [status, setStatus] = useState(rec.status ?? 'correct');
   const [f, setF] = useState({ condition: '', usage: '', actual: [], lon: '', lat: '', reason: '', remarks: '' });
   const locked = kind === 'room' && (bldgLocked
@@ -255,6 +263,7 @@ function StepForm({ kind, rec, bldgLocked, lists, db, isSchool, onDone, onFail, 
 
   async function save(e) {
     e.preventDefault();
+    if (kind === 'building' && status === 'for_deletion' && !isSchool && !confirmDeletion(rec, rooms)) return;
     setBusy(true);
     setErr(null);
     const corr = status === 'corrected';
@@ -423,7 +432,7 @@ function DpoCheck({ db, schoolId, openItems, canAct, onDone, onFail }) {
 
 // A school's update waiting beside the record. The DE or DPO accepts it by recording the same step,
 // or answers with their own step through the usual form.
-function SchoolUpdate({ u, rec, kind, isSchool, canAccept, db, onDone, onFail }) {
+function SchoolUpdate({ u, rec, rooms, kind, isSchool, canAccept, db, onDone, onFail }) {
   const [busy, setBusy] = useState(false);
   if (!u) return null;
   const parts = [
@@ -434,6 +443,7 @@ function SchoolUpdate({ u, rec, kind, isSchool, canAccept, db, onDone, onFail })
     u.deletion_reason && `reason: ${u.deletion_reason}`,
   ].filter(Boolean);
   async function accept() {
+    if (kind === 'building' && u.status === 'for_deletion' && !confirmDeletion(rec, rooms)) return;
     setBusy(true);
     const common = { p_seen: rec.last_step_id, p_status: u.status, p_condition: u.validated_condition,
       p_reason: u.deletion_reason, p_remarks: u.remarks };
