@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Load CO's school-level NSBI tables for an earlier school year (SY 2022-2023 onwards).
+"""Load CO's school-level NSBI tables for an earlier school year (SY 2021-2022 onwards).
 
     DATABASE_URL=postgresql://... python3 scripts/load_co_past_years.py SY2023-2024 FILE.xlsx [FILE.xlsx ...]
     python3 scripts/load_co_past_years.py --check FILE.xlsx [...]   (prints each column's key; loads nothing)
 
 Each file is recognised by its name: buildings by condition (BLD), number of classrooms (CLS),
 temporary learning spaces (T3), WATSAN (T4), furniture (T5), other facilities (T6) and access going
-to school (T7). CO's layout differs from year to year, with group headings over two to four rows,
+to school (T7). SY 2021-2022 came as one workbook with a sheet per table ("TABLE 1" to "TABLE 7");
+each sheet is read as its own table, and its Table 1, a list of buildings, is counted per school and
+condition into BLD. CO's layout differs from year to year, with group headings over two to four rows,
 so a column is read by its full heading (group, item and level), never by its position, and is given
 the same key as the SY 2024-2025 tables so a report can set the years side by side:
   - Levels as CO gives them: ES, and JHS and SHS where CO splits them (often as fractions of a
@@ -44,7 +46,7 @@ TABLES = [  # (code, file name pattern)
     ("T7", r"ACCESS GOING"),
 ]
 ID_HEADERS = {
-    "School ID": ("lis school id",),
+    "School ID": ("lis school id", "beis school id"),
     "Division": ("division",),
     "School Name": ("school name",),
     "District": ("district",),
@@ -96,6 +98,23 @@ def level_of(text):
         if re.search(pat, t):
             return lvl
     return None
+
+
+SHEETS = [  # SY 2021-2022: one workbook, a sheet per table
+    ("BLD", r"^TABLE 1$"), ("CLS", r"^TABLE 2$"), ("T3", r"^TABLE 3$"), ("T4", r"^TABLE 4"),
+    ("T5", r"^TABLE 5$"), ("T6", r"^TABLE 6$"), ("T7", r"^TABLE 7$"),
+]
+
+
+def units(path, strict=True):
+    """[(code, sheet)] for a file: each table sheet of a whole-database workbook, else the file's
+    one table (sheet None)."""
+    names = openpyxl.load_workbook(path, read_only=True).sheetnames
+    found = [(code, n) for n in names for code, pat in SHEETS if re.search(pat, n.strip().upper())]
+    if len(found) > 1:
+        return found
+    code = table_of(path, strict)
+    return [(code, None)] if code else []
 
 
 def table_of(path, strict=True):
@@ -213,19 +232,28 @@ def collapse(measures, code):
     return {k: v if v is None or abs(v - round(v)) > 0.01 else int(round(v)) for k, v in out.items()}
 
 
-def read(code, path):
+def sheet_rows(path, sheet):
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    rows = list(wb.worksheets[0].iter_rows(values_only=True))
-    hr = next((i + 1 for i, r in enumerate(rows[:12]) if any((text(c) or "").lower() == "lis school id" for c in r)), None)
+    return list((wb[sheet] if sheet else wb.worksheets[0]).iter_rows(values_only=True))
+
+
+def label(path, sheet):
+    return os.path.basename(path) + (f" [{sheet}]" if sheet else "")
+
+
+def read(code, path, sheet=None):
+    rows = sheet_rows(path, sheet)
+    hr = next((i + 1 for i, r in enumerate(rows[:12])
+               if any((text(c) or "").lower() in ID_HEADERS["School ID"] for c in r)), None)
     if not hr:
-        sys.exit(f"{os.path.basename(path)}: no 'LIS School ID' heading in the first 12 rows.")
+        sys.exit(f"{label(path, sheet)}: no 'LIS School ID' or 'BEIS School ID' heading in the first 12 rows.")
     heads = headings(rows, hr)
     names = [(h[-1] or "").lower() for h in heads]
     idcol = {k: next((j for j, h in enumerate(names) if h in alts), None) for k, alts in ID_HEADERS.items()}
     region = names.index("region") if "region" in names else None
     for k in ("School ID", "Division", "School Name"):
         if idcol[k] is None:
-            sys.exit(f"{os.path.basename(path)}: no '{k}' column in row {hr}.")
+            sys.exit(f"{label(path, sheet)}: no '{k}' column in row {hr}.")
     first = max(j for j in idcol.values() if j is not None)
     cols = {}
     for j, h in enumerate(heads):
@@ -240,8 +268,46 @@ def read(code, path):
     return rows, hr, heads, idcol, region, cols
 
 
-def stage(code, path, out):
-    rows, hr, heads, idcol, region, cols = read(code, path)
+def stage_buildings(path, sheet, out):
+    """SY 2021-2022 Table 1 lists each building; BLD is the count per school and condition."""
+    rows = sheet_rows(path, sheet)
+    hr = next((i + 1 for i, r in enumerate(rows[:12]) if any((text(c) or "").lower() == "building condition" for c in r)), None)
+    if not hr:
+        sys.exit(f"{label(path, sheet)}: no 'Building Condition' heading in the first 12 rows.")
+    names = [(text(c) or "").lower() for c in rows[hr - 1]]
+    col = lambda *alts: next((j for j, h in enumerate(names) if h in alts), None)
+    idcol = {k: col(*alts, "school id") if k == "School ID" else col(*alts) for k, alts in ID_HEADERS.items()}
+    region, cond = col("region"), col("building condition")
+    schools, skipped = {}, set()
+    for i, row in enumerate(rows[hr:], start=hr + 1):
+        sid = text(row[idcol["School ID"]])
+        if not sid or not sid.isdigit():
+            continue
+        if region is not None and text(row[region]) != "Region VII":
+            sys.exit(f"{label(path, sheet)} row {i}: Region is '{text(row[region])}', not Region VII. Wrong file?")
+        rec = {k: text(row[j]) if j is not None else None for k, j in idcol.items()}
+        if rec["Division"] in NIR:
+            skipped.add(sid)
+            continue
+        c = text(row[cond])
+        if c not in CONDITIONS:
+            sys.exit(f"{label(path, sheet)} row {i}: building condition '{c}' is not one RIVET knows.")
+        s = schools.setdefault(sid.zfill(6), dict(rec, **{"School ID": sid.zfill(6), "measures": {}, "first_row": i}))
+        s["measures"][c] = s["measures"].get(c, 0) + 1
+    writer = csv.writer(out)
+    for rec in schools.values():
+        i = rec.pop("first_row")
+        rec["cells"] = {}
+        writer.writerow(["BLD", i, json.dumps(rec, ensure_ascii=False)])
+    print(f"BLD: {len(schools)} schools from {label(path, sheet)}, counted from its list of buildings "
+          f"(left out {len(skipped)} of the Negros Island Region divisions)")
+    return len(schools)
+
+
+def stage(code, path, out, sheet=None):
+    if sheet and code == "BLD":
+        return stage_buildings(path, sheet, out)
+    rows, hr, heads, idcol, region, cols = read(code, path, sheet)
     n = skipped = 0
     writer = csv.writer(out)
     for i, row in enumerate(rows[hr:], start=hr + 1):
@@ -250,7 +316,7 @@ def stage(code, path, out):
         if not sid or not sid.isdigit():
             continue
         if region is not None and text(row[region]) != "Region VII":
-            sys.exit(f"{os.path.basename(path)} row {i}: Region is '{text(row[region])}', not Region VII. Wrong file?")
+            sys.exit(f"{label(path, sheet)} row {i}: Region is '{text(row[region])}', not Region VII. Wrong file?")
         rec = {k: text(row[j]) if j is not None else None for k, j in idcol.items()}
         if rec["Division"] in NIR:
             skipped += 1
@@ -265,21 +331,34 @@ def stage(code, path, out):
         rec["cells"] = {f"{j + 1}:{' / '.join(p for p in heads[j] if p)}": text(v) for j, v in enumerate(row) if v is not None}
         writer.writerow([code, i, json.dumps(rec, ensure_ascii=False)])
         n += 1
-    print(f"{code}: {n} schools from {os.path.basename(path)} (left out {skipped} of the Negros Island Region divisions)")
+    print(f"{code}: {n} schools from {label(path, sheet)} (left out {skipped} of the Negros Island Region divisions)")
     return n
 
 
 def check(path):
-    code = table_of(path)
-    rows, hr, heads, idcol, region, cols = read(code, path)
-    print(f"== {os.path.basename(path)}: {code}, heading row {hr}")
-    for j, k in cols.items():
-        label = " / ".join(p for p in heads[j] if p)
-        if heads[j][-1]:
-            print(f"  c{j + 1}: {label[:90]!s:90}  -> {k[0] + ('_' + k[1] if k[1] else '') if k else '(cells only)'}")
+    for code, sheet in units(path):
+        check_one(code, path, sheet)
+
+
+def check_one(code, path, sheet):
     import io
     buf = io.StringIO()
-    stage(code, path, buf)
+    if sheet and code == "BLD":
+        print(f"== {label(path, sheet)}: BLD, a list of buildings")
+        stage(code, path, buf, sheet)
+        return totals(buf)
+    rows, hr, heads, idcol, region, cols = read(code, path, sheet)
+    print(f"== {label(path, sheet)}: {code}, heading row {hr}")
+    for j, k in cols.items():
+        head = " / ".join(p for p in heads[j] if p)
+        if heads[j][-1]:
+            print(f"  c{j + 1}: {head[:90]!s:90}  -> {k[0] + ('_' + k[1] if k[1] else '') if k else '(cells only)'}")
+    stage(code, path, buf, sheet)
+    totals(buf)
+
+
+def totals(buf):
+    import io
     tot = {}
     for line in csv.reader(io.StringIO(buf.getvalue())):
         for k, v in json.loads(line[2])["measures"].items():
@@ -308,20 +387,20 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         script = []
         for path in files:
-            code = table_of(path, strict=False)
-            if code is None:
+            found = units(path, strict=False)
+            if not found:
                 print(f"Skipped {os.path.basename(path)}: not one of the NSBI tables this loader reads")
-                continue
-            if code in done:
-                print(f"Skipped {os.path.basename(path)}: {code} is already loaded for {cycle}")
-                continue
-            done.add(code)
-            staged = os.path.join(tmp, f"{code}.csv")
-            with open(staged, "w", newline="", encoding="utf-8") as out:
-                stage(code, path, out)
-            name = os.path.basename(path).replace("'", "''")
-            script.append(f"\\copy co_staging (co_table, source_row, rec) from '{staged}' with (format csv)")
-            script.append(f"select load_co_school_table('{cycle}', '{code}', '{name}', '{sha256(path)}');")
+            for code, sheet in found:
+                if code in done:
+                    print(f"Skipped {label(path, sheet)}: {code} is already loaded for {cycle}")
+                    continue
+                done.add(code)
+                staged = os.path.join(tmp, f"{code}.csv")
+                with open(staged, "w", newline="", encoding="utf-8") as out:
+                    stage(code, path, out, sheet)
+                name = label(path, sheet).replace("'", "''")
+                script.append(f"\\copy co_staging (co_table, source_row, rec) from '{staged}' with (format csv)")
+                script.append(f"select load_co_school_table('{cycle}', '{code}', '{name}', '{sha256(path)}');")
         if not script:
             print(f"{cycle}: nothing new to load.")
             return
