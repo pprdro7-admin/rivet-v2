@@ -8,7 +8,6 @@ import { fetchAll } from '../lib/fetchAll.js';
 // Every report reads per-school lines and adds them up here, so a group's figure is always the sum
 // of its schools (ratios are worked out from the sums, never averaged).
 
-const PRIOR = 'SY2024-2025';
 const LEVELS = {
   all: ['All levels', null],
   es: ['Elementary', /_(es|elem)$/],
@@ -140,7 +139,7 @@ export default function Reports({ db, me }) {
   const [sdos, setSdos] = useState([]);
   const [schools, setSchools] = useState(null);
   const [lists, setLists] = useState(null);
-  const [f, setF] = useState({ year: CYCLE, multi: false, sdo: me.sdo_code ?? '', district: '', level: 'all', group: isRegion ? 'sdo' : 'district', zero: false });
+  const [f, setF] = useState({ year: CYCLE, from: '', sdo: me.sdo_code ?? '', district: '', level: 'all', group: isRegion ? 'sdo' : 'district', zero: false });
   const [pick, setPick] = useState(null);
   const [error, setError] = useState(null);
 
@@ -160,7 +159,7 @@ export default function Reports({ db, me }) {
   }, [db]);
 
   const districts = useMemo(() => [...new Set(Object.values(schools ?? {}).filter((s) => !f.sdo || s.sdo_code === f.sdo).map((s) => s.district).filter(Boolean))].sort(), [schools, f.sdo]);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value, ...(k === 'sdo' ? { district: '' } : {}) });
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value, ...(k === 'sdo' ? { district: '' } : {}), ...(k === 'year' && f.from >= e.target.value ? { from: '' } : {}) });
 
   if (error) return <main className="page"><ErrorNote error={error} /></main>;
   if (!schools || !lists) return <main className="page"><Loading /></main>;
@@ -178,9 +177,9 @@ export default function Reports({ db, me }) {
             </select>
           </label>
           <label className="f">Multi-year
-            <select value={f.multi ? 'multi' : 'single'} onChange={(e) => setF({ ...f, multi: e.target.value === 'multi' })}>
-              <option value="single">Single year</option>
-              <option value="multi">SY 2024–2025 and 2025–2026</option>
+            <select value={f.from} onChange={set('from')}>
+              <option value="">Single year</option>
+              {years.filter((y) => y.cycle_id < f.year).map((y) => <option key={y.cycle_id} value={y.cycle_id}>From {y.label} to {years.find((x) => x.cycle_id === f.year)?.label}</option>)}
             </select>
           </label>
           <label className="f">Level (Tables 3 to 5)
@@ -224,7 +223,7 @@ export default function Reports({ db, me }) {
         ))}
       </div>
 
-      {pick && <Report key={pick.id} db={db} report={pick} f={f} schools={schools} sdos={sdos} lists={lists} />}
+      {pick && <Report key={pick.id} db={db} report={pick} f={{ ...f, range: years.map((y) => y.cycle_id).filter((y) => f.from && y >= f.from && y <= f.year).sort() }} schools={schools} sdos={sdos} lists={lists} />}
     </main>
   );
 }
@@ -236,9 +235,13 @@ function Report({ db, report, f, schools, sdos, lists }) {
   const ref = React.useRef(null);
 
   // Which years this report shows.
-  const years = report.table && f.multi ? [PRIOR, CYCLE]
-    : report.multi && f.multi ? ['prior', CYCLE] : [report.yearOnly ?? (report.table ? f.year : CYCLE)];
-  const wrongYear = report.notCurrent && f.year === CYCLE && !f.multi;
+  // Multi-year: Tables 3 to 5 read each year in the range; Instructional Rooms reads CO's classroom
+  // summary for the past years beside this cycle's NSBI and validated counts.
+  const multi = report.multi && f.range.length > 1;
+  const years = multi && report.table ? f.range
+    : multi ? [...f.range.filter((y) => y < CYCLE).map((y) => `cls:${y}`), CYCLE]
+      : [report.yearOnly ?? (report.table ? f.year : CYCLE)];
+  const wrongYear = report.notCurrent && f.year === CYCLE && !multi;
 
   useEffect(() => {
     setData(null); setError(null);
@@ -253,17 +256,18 @@ function Report({ db, report, f, schools, sdos, lists }) {
       const loader = report.loader === 'bcond' ? load.byCondition('building') : report.loader === 'rcond' ? load.byCondition('room')
         : report.table ? load.table(report.loader.toUpperCase()) : load[report.loader];
       const parts = await Promise.all(years.map(async (y) => {
-        if (y === 'prior') {
-          // Instructional rooms in SY 2024-2025: CO's classroom summary.
-          const rows = await fetchAll(() => scoped(db.from('co_school_records').select('school_id, sdo_code, measures').eq('cycle_id', PRIOR).eq('co_table', 'CLS'), f, false));
-          return { year: PRIOR, rows: rows.map((r) => ({ school_id: r.school_id, sdo_code: r.sdo_code, prior: Math.round(sumKeys(r.measures, /^instructional_rooms_/, null)) })), source: 'SY 2024–2025: CO classroom summary' };
+        if (y.startsWith('cls:')) {
+          // Instructional rooms in a past year: CO's classroom summary.
+          const year = y.slice(4);
+          const rows = await fetchAll(() => scoped(db.from('co_school_records').select('school_id, sdo_code, measures').eq('cycle_id', year).eq('co_table', 'CLS'), f, false));
+          return { year, prior: true, rows: rows.map((r) => ({ school_id: r.school_id, sdo_code: r.sdo_code, prior: Math.round(sumKeys(r.measures, /^instructional_rooms_/, null)) })), source: `${year.replace('SY', 'SY ')}: CO classroom summary` };
         }
-        const x = await loader(db, { ...f, year: y === 'prior' ? PRIOR : (report.table ? y : f.year) });
+        const x = await loader(db, { ...f, year: report.table ? y : f.year });
         return { year: y, ...x };
       }));
       setData({ parts });
     })().catch(setError);
-  }, [db, report, f.year, f.multi, f.sdo, f.district]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [db, report, f.year, f.range.join(), f.sdo, f.district]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const out = useMemo(() => (data && !data.list ? build(report, data.parts, f, level, schools, sdos, lists) : null), [data, report, f, level, schools, sdos, lists]);
 
@@ -310,7 +314,7 @@ const cell = (v) => (v === null || v === undefined || v === '' ? null : typeof v
 
 function filterText(f, sdos) {
   const sdo = f.sdo ? sdos.find((s) => s.code === f.sdo)?.name ?? f.sdo : 'Region VII';
-  return [sdo, f.district || null, f.multi ? 'SY 2024–2025 and 2025–2026' : f.year.replace('SY', 'SY '),
+  return [sdo, f.district || null, f.from ? `${f.from.replace('SY', 'SY ')} to ${f.year.replace('SY', 'SY ')}` : f.year.replace('SY', 'SY '),
     f.level !== 'all' ? LEVELS[f.level][0] : null, `by ${GROUPS[f.group].toLowerCase()}`].filter(Boolean).join(' · ');
 }
 
@@ -343,7 +347,7 @@ function build(report, parts, f, level, schools, sdos, lists) {
       const sums = g.sums[pi];
       const extra = report.perSchool ? report.perSchool(r, level) : {};
       const line = { ...r, ...extra };
-      if (p.year === PRIOR && 'prior' in r) { sums.prior = (sums.prior ?? 0) + r.prior; return; }
+      if (p.prior) { sums.prior = (sums.prior ?? 0) + r.prior; return; }
       sumCols(columns).forEach((c) => { sums[c.key] = (sums[c.key] ?? 0) + Number(valueOf(c, line) || 0); });
     });
   });
@@ -354,16 +358,16 @@ function build(report, parts, f, level, schools, sdos, lists) {
     return c.fmt ? c.fmt(v) : v;
   };
   const yearLabel = (y) => y.replace('SY', 'SY ').replace('-', '–');
-  const priorOnly = multi && parts[0].year === PRIOR && parts[0].rows[0] && 'prior' in parts[0].rows[0];
+  const priors = parts.filter((p) => p.prior).length;
 
   let header;
-  if (priorOnly) header = [...idCols, 'SY 2024–2025 (CO)', ...columns.map((c) => c.label)];
+  if (priors) header = [...idCols, ...parts.slice(0, priors).map((p) => `${yearLabel(p.year)} (CO)`), ...columns.map((c) => c.label)];
   else if (multi) header = [...idCols, ...parts.flatMap((p) => columns.map((c) => `${c.label}, ${yearLabel(p.year)}`))];
   else header = [...idCols, ...columns.map((c) => c.label)];
 
   const cellsOf = (sums) => {
     const derived = sums.map((s) => ({ ...s, ...(report.derive ? report.derive(s) : {}) }));
-    if (priorOnly) return [sums[0].prior ?? 0, ...columns.map((c) => fmtOf(c, derived[1][c.key] ?? 0))];
+    if (priors) return [...sums.slice(0, priors).map((x) => x.prior ?? 0), ...columns.map((c) => fmtOf(c, derived[priors][c.key] ?? 0))];
     return derived.flatMap((d) => columns.map((c) => fmtOf(c, d[c.key] ?? (c.key === 'ratio' ? null : 0))));
   };
   const isZero = (sums) => sums.every((s) => Object.values(s).every((v) => !v));
