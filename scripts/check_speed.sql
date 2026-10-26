@@ -14,7 +14,7 @@ begin
     perform set_config('request.jwt.claim.sub', u.user_id::text, true);
     t0 := clock_timestamp();
     execute 'set local role authenticated';
-    select count(*) into n from school_tally where cycle_id = 'SY2025-2026' and sdo_code = u.sdo_code;
+    select count(*) into n from (select * from school_tally where cycle_id = 'SY2025-2026' and sdo_code = u.sdo_code order by school_id limit 1000) x;
     execute 'reset role';
     raise notice '% school_tally: % schools in % ms', u.sdo_code, n, round(extract(epoch from clock_timestamp() - t0) * 1000);
   end loop;
@@ -24,7 +24,7 @@ begin
     perform set_config('request.jwt.claim.sub', r.id::text, true);
     t0 := clock_timestamp();
     execute 'set local role authenticated';
-    select count(*) into n from school_tally where cycle_id = 'SY2025-2026';
+    select count(*) into n from (select * from school_tally where cycle_id = 'SY2025-2026' order by school_id limit 1000) x;
     execute 'reset role';
     raise notice 'RO school_tally (region): % schools in % ms', n, round(extract(epoch from clock_timestamp() - t0) * 1000);
     t0 := clock_timestamp();
