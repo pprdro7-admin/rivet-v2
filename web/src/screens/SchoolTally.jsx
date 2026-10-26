@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct } from '../lib/labels.js';
+import { RELOCATION } from '../components/Relocation.jsx';
 import { fetchAll } from '../lib/fetchAll.js';
 import { CoNotes, StateChip } from '../components/Returns.jsx';
 
@@ -20,15 +21,19 @@ export default function SchoolTally({ db, me, sdoCode }) {
   const [q, setQ] = useState('');
   const [show, setShow] = useState(me.role === 'dpo' ? 'check' : 'todo');
   const [returns, setReturns] = useState({});
+  const [moved, setMoved] = useState({});
 
   useEffect(() => {
     setRows(null);
     fetchAll(() => db.from('school_tally').select('*').eq('cycle_id', CYCLE).eq('sdo_code', sdoCode)
-      .order('flagged_rooms', { ascending: false }).order('school_name').order('school_id'))
-      .then(setRows, setError);
+      .order('school_id'))
+      // Alphabetical as people read it (the database puts capitals first): no ranking between schools.
+      .then((r) => setRows(r.sort((a, b) => a.school_name.localeCompare(b.school_name, 'en', { sensitivity: 'base' }))), setError);
     db.from('return_status').select('school_id, state').eq('cycle_id', CYCLE).eq('kind', 'de_to_school')
       .eq('sdo_code', sdoCode).neq('state', 'closed')
       .then(({ data }) => setReturns(Object.fromEntries((data ?? []).map((r) => [r.school_id, r.state]))));
+    db.from('school_relocation').select('school_id, kind').eq('cycle_id', CYCLE).eq('sdo_code', sdoCode)
+      .then(({ data }) => setMoved(Object.fromEntries((data ?? []).map((r) => [r.school_id, r.kind]))));
   }, [db, sdoCode]);
 
   const shown = useMemo(() => {
@@ -49,7 +54,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
         <span className="muted">{n(done)} of {n(rows.length)} schools complete</span>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Every building and room gets a status, not only the flagged ones. Schools with the most flagged rooms are listed first.
+        Every building and room gets a status, not only the flagged ones. Schools are listed alphabetically.
       </p>
       <div className="filters">
         <label className="f">Find a school<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, School ID or district" /></label>
@@ -68,7 +73,8 @@ export default function SchoolTally({ db, me, sdoCode }) {
             <tbody>
               {shown.slice(0, 300).map((s) => (
                 <tr key={s.school_id} className="click" onClick={() => go(`#/school/${s.school_id}`)}>
-                  <td><a href={`#/school/${s.school_id}`}>{s.school_name}</a><div className="mono muted">{s.school_id}</div></td>
+                  <td><a href={`#/school/${s.school_id}`}>{s.school_name}</a><div className="mono muted">{s.school_id}</div>
+                    {moved[s.school_id] && <span className="chip gray small">{RELOCATION[moved[s.school_id]]}</span>}</td>
                   <td data-label="District">{s.district}</td>
                   <td className="num" data-label="Buildings NSBI → validated">{s.co_buildings} → <b style={{ color: s.buildings_after !== s.co_buildings ? 'var(--red)' : undefined }}>{s.buildings_after}</b></td>
                   <td className="num" data-label="Rooms NSBI → validated">{s.co_rooms} → <b style={{ color: s.rooms_after !== s.co_rooms ? 'var(--red)' : undefined }}>{s.rooms_after}</b></td>

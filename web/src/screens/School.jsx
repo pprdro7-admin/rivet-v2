@@ -3,6 +3,7 @@ import { ErrorNote, Loading, StatusChip } from '../components/ui.jsx';
 import { CYCLE, SOURCE, n, pct, problem, STATUS } from '../lib/labels.js';
 import OtherNsbiData from '../components/OtherNsbiData.jsx';
 import { CoNotes, SendBack, loadSendBack } from '../components/Returns.jsx';
+import Relocation from '../components/Relocation.jsx';
 
 // One school: every building with its rooms, the SDO's step on each, the school's updates waiting for
 // the SDO, new records, the DPO's check.
@@ -23,17 +24,18 @@ export default function School({ db, me, schoolId }) {
       eqs('live_new_rooms').order('id'),
       db.rpc('school_open_items', { p_cycle: CYCLE, p_school: schoolId }),
       eqs('school_updates'),
+      eqs('school_relocation').maybeSingle(),
     ]);
     const bad = res.find((r) => r.error);
     if (bad) { setError(bad.error); return; }
-    const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates] = res.map((r) => r.data);
+    const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates, relocation] = res.map((r) => r.data);
     const [bf, rf, sendBack] = await Promise.all([
       db.from('building_flag_text').select('*').in('building_id', buildings.map((b) => b.building_id)),
       db.from('room_flag_text').select('*').in('room_id', rooms.map((r) => r.room_id)),
       loadSendBack(db, schoolId),
     ]);
     const flagsOf = (rows, key) => Object.fromEntries((rows.data || []).map((x) => [x[key], x.flags]));
-    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems, sendBack,
+    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems, sendBack, relocation,
       updates: Object.fromEntries(updates.map((u) => [`${u.kind === 'building' ? 'b' : 'r'}:${u.record_id}`, u])),
       bflags: flagsOf(bf, 'building_id'), rflags: flagsOf(rf, 'room_id') });
   }, [db, schoolId]);
@@ -95,6 +97,8 @@ export default function School({ db, me, schoolId }) {
       {t.dpo_result === 'returned' && !t.dpo_complete && <div className="notice warn"><b>Returned by the DPO:</b> {t.dpo_remarks}</div>}
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}
+
+      <Relocation db={db} schoolId={schoolId} relocation={data.relocation} isSDO={isSDO} onDone={(m) => { setNote({ ok: m }); load(); }} />
 
       <SendBack db={db} schoolId={schoolId} sendBack={data.sendBack} buildings={data.buildings} rooms={data.rooms}
         isSDO={isSDO} isSchool={isSchool} onDone={(m) => { setNote({ ok: m }); load(); }} />
