@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getClient, currentUserId, signOut } from './lib/supabase.js';
 import { Header, Loading, ErrorNote, go } from './components/ui.jsx';
+import ChangePassword from './screens/ChangePassword.jsx';
 import SignIn from './screens/SignIn.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import SchoolTally from './screens/SchoolTally.jsx';
@@ -60,6 +61,7 @@ export default function App() {
   if (me === undefined || !db) page = <div className="page"><Loading /></div>;
   else if (!me) page = <SignIn onSignedIn={load} />;
   else if (me.active === false) page = <div className="page"><div className="notice warn">This account no longer has access to RIVET. If you still need it, ask your Division Planning Officer.</div></div>;
+  else if (route === '#/password') page = <ChangePassword me={me} />;
   else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
   else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;

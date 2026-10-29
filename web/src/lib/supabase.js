@@ -108,3 +108,13 @@ export async function signOut() {
   const db = await getClient();
   await db.auth.signOut();
 }
+
+// Sets a new password for the signed-in user. Returns an error message, or null when changed.
+export async function changePassword(password) {
+  const db = await getClient();
+  const { error } = await db.auth.updateUser({ password });
+  if (!error) return null;
+  if (/different from the old/i.test(error.message)) return 'The new password must be different from the current one.';
+  if (/weak|at least/i.test(error.message)) return `That password is too weak (${error.message}).`;
+  return error.message;
+}

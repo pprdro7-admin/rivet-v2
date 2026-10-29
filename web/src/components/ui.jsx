@@ -40,7 +40,7 @@ export function Header({ me, route, onSignOut }) {
         <div className="topbar-in">
           <a className="brand" href="#/home"><b>RIVET</b><span>{office}</span></a>
           <nav className="nav">
-            {me && <a href="#/home" className={['#/dashboard', '#/access', '#/reports', '#/inventory'].includes(route) ? '' : 'on'}>{me.role === 'school' ? 'My school' : 'Validation'}</a>}
+            {me && <a href="#/home" className={['#/dashboard', '#/access', '#/reports', '#/inventory', '#/password'].includes(route) ? '' : 'on'}>{me.role === 'school' ? 'My school' : 'Validation'}</a>}
             {me && me.role !== 'school' && <a href="#/inventory" className={route === '#/inventory' ? 'on' : ''}>Inventory</a>}
             {me && me.role !== 'school' && <a href="#/dashboard" className={route === '#/dashboard' ? 'on' : ''}>Dashboard</a>}
             {me && me.role !== 'school' && <a href="#/reports" className={route === '#/reports' ? 'on' : ''}>Reports</a>}
@@ -49,6 +49,7 @@ export function Header({ me, route, onSignOut }) {
           {me && (
             <div className="who">
               <span>{me.full_name} · {me.office && me.role === 'co' ? 'View only' : ROLE[me.role]}</span>
+              <a href="#/password">Change password</a>
               <button type="button" onClick={onSignOut}>Sign out</button>
             </div>
           )}
