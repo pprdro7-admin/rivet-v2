@@ -13,7 +13,7 @@ export default function ChangePassword({ me }) {
   async function submit(e) {
     e.preventDefault();
     setError(null);
-    if (password.length < 10) { setError('Use at least 10 characters.'); return; }
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) { setError('Use at least 8 characters, with letters and numbers.'); return; }
     if (password !== again) { setError('The two passwords do not match.'); return; }
     setBusy(true);
     const trouble = await changePassword(password);
@@ -26,7 +26,7 @@ export default function ChangePassword({ me }) {
     <main className="page" style={{ maxWidth: 560 }}>
       <div className="card" style={{ gap: 16 }}>
         <h1>Change password</h1>
-        <p style={{ margin: 0 }}>For {me.email}. Use at least 10 characters that others cannot guess, and do not share it.</p>
+        <p style={{ margin: 0 }}>For {me.email}. Use at least 8 characters, with letters and numbers, that others cannot guess. Do not share it.</p>
         {isLocal && <div className="notice">The local copy has no passwords.</div>}
         {!isLocal && (
           <form className="stack" onSubmit={submit}>

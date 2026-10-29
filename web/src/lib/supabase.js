@@ -6,16 +6,16 @@ import { createClient } from '@supabase/supabase-js';
 //   (it needs an OAuth client from Google Cloud, which the DepEd Workspace has switched off for staff).
 // - On a laptop (scripts/dev.sh): the local database, where "signing in" means picking one of the
 //   sample accounts. The local server accepts tokens signed with a throwaway development secret.
-// A read that hits the database's time limit (often a cold or busy moment on the shared server)
-// is tried again, up to twice, before the screen shows the error. Saves are never repeated.
+// A request that hits the database's time limit (often a cold or busy moment on the shared server)
+// is tried again, up to three times, before the screen shows the error. That is safe for saves too:
+// the database cancels the timed-out statement and keeps nothing of it.
 async function patientFetch(input, init = {}) {
-  const method = (init.method || 'GET').toUpperCase();
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetch(input, init);
-    if (method !== 'GET' || res.status < 500 || attempt >= 2) return res;
+    if (res.status < 500 || attempt >= 3) return res;
     const body = await res.clone().json().catch(() => null);
     if (body?.code !== '57014') return res;
-    await new Promise((ok) => setTimeout(ok, 1000 * (attempt + 1)));
+    await new Promise((ok) => setTimeout(ok, 1500 * (attempt + 1)));
   }
 }
 

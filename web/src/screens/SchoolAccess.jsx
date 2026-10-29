@@ -5,16 +5,16 @@ import { fetchAll } from '../lib/fetchAll.js';
 
 const when = (t) => (t ? new Date(t).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
-// A starting password the DPO reads out or hands over: 10 characters, letters and digits, no look-alikes.
+// A starting password the DPO reads out or hands over: 8 characters, letters and digits, no look-alikes.
 export function makePassword() {
   const letters = 'abcdefghjkmnpqrstuvwxyz';
   const digits = '23456789';
   const all = letters + letters.toUpperCase() + digits;
-  const r = new Uint32Array(10);
+  const r = new Uint32Array(8);
   crypto.getRandomValues(r);
   const p = [...r].map((x) => all[x % all.length]);
   p[0] = letters[r[0] % letters.length];
-  p[9] = digits[r[9] % digits.length];
+  p[7] = digits[r[7] % digits.length];
   return p.join('');
 }
 
