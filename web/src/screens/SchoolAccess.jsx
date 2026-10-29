@@ -6,7 +6,7 @@ import { fetchAll } from '../lib/fetchAll.js';
 const when = (t) => (t ? new Date(t).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
 // A starting password the DPO reads out or hands over: 10 characters, letters and digits, no look-alikes.
-function makePassword() {
+export function makePassword() {
   const letters = 'abcdefghjkmnpqrstuvwxyz';
   const digits = '23456789';
   const all = letters + letters.toUpperCase() + digits;

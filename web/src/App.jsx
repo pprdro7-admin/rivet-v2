@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getClient, currentUserId, signOut } from './lib/supabase.js';
 import { Header, Loading, ErrorNote, go } from './components/ui.jsx';
 import ChangePassword from './screens/ChangePassword.jsx';
+import StaffAccounts from './screens/StaffAccounts.jsx';
 import SignIn from './screens/SignIn.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import SchoolTally from './screens/SchoolTally.jsx';
@@ -67,6 +68,7 @@ export default function App() {
   else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;
   else if (route === '#/reports') page = <Reports db={db} me={me} />;
   else if (route === '#/inventory') page = <Inventory db={db} me={me} />;
+  else if (route === '#/accounts' && me.role === 'ro') page = <StaffAccounts db={db} />;
   else if (route === '#/access' && me.role === 'dpo') page = <SchoolAccess db={db} me={me} />;
   else if (route.startsWith('#/sdo/')) page = <SchoolTally db={db} me={me} sdoCode={route.slice('#/sdo/'.length)} />;
   else if (REGION_ROLES.includes(me.role)) page = <RegionProgress db={db} me={me} />;
