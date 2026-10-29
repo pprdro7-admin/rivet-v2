@@ -105,8 +105,15 @@ export async function signOut() {
     client = null;
     return;
   }
+  // Ends the session on the server too; if that request fails, the session must still end here,
+  // or the next page load signs the person straight back in (Ada, 2026-10-29).
   const db = await getClient();
-  await db.auth.signOut();
+  const { error } = await db.auth.signOut().catch((e) => ({ error: e }));
+  if (error) await db.auth.signOut({ scope: 'local' }).catch(() => {});
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k));
+  } catch { /* storage blocked: nothing kept there */ }
+  client = null;
 }
 
 // Sets a new password for the signed-in user. Returns an error message, or null when changed.
