@@ -129,7 +129,7 @@ export function CoNotes({ db, me, sdoCode, schoolId, schoolSdo }) {
   const [form, setForm] = useState(null);
   const [answer, setAnswer] = useState({});
   const [err, setErr] = useState(null);
-  const isCO = me.role === 'co';
+  const isCO = me.role === 'co' && !me.office; // a view-only regional office (ESSD) does not write CO notes
   const isRO = me.role === 'ro';
 
   const load = useCallback(() => {

@@ -27,6 +27,7 @@ export function Bar({ share }) {
 
 export function Header({ me, route, onSignOut }) {
   const office = !me ? 'DepEd Region VII'
+    : me.office ? me.office
     : me.sdo_code ? `SDO ${me.sdos?.name ?? me.sdo_code}` : me?.role === 'co' ? 'DepEd Central Office' : 'Regional Office · PPRD';
   return (
     <>
@@ -47,7 +48,7 @@ export function Header({ me, route, onSignOut }) {
           </nav>
           {me && (
             <div className="who">
-              <span>{me.full_name} · {ROLE[me.role]}</span>
+              <span>{me.full_name} · {me.office && me.role === 'co' ? 'View only' : ROLE[me.role]}</span>
               <button type="button" onClick={onSignOut}>Sign out</button>
             </div>
           )}
