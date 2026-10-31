@@ -1,0 +1,47 @@
+name: Back up the database
+
+# Saves a full copy of the validation database to the private Storage bucket "co-files", folder
+# backups/. Run it before every push that changes the database, and whenever a copy is wanted.
+# The repository is public, so the copy is never kept as a GitHub artifact and nothing from it is
+# printed in the log: it holds every school entry and the accounts' password hashes.
+# Restoring: docs/runbooks/BACKUP_AND_RESTORE.md.
+on:
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: validation
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Postgres 17 tools
+        run: |
+          sudo apt-get install -y -q postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -q postgresql-client-17 >/dev/null
+      - name: Copy the database
+        run: |
+          set -euo pipefail
+          PG=/usr/lib/postgresql/17/bin
+          STAMP=$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}
+          mkdir out
+          # Everything RIVET keeps: tables, rules, screens' functions, permissions, and which updates ran.
+          $PG/pg_dump "$DATABASE_URL" -Fc -Z9 --no-owner -n public -n supabase_migrations \
+            -f "out/rivet-$STAMP.dump"
+          # The sign-in accounts (emails and password hashes), so every account works again after a restore.
+          $PG/pg_dump "$DATABASE_URL" -Fc -Z9 --no-owner --data-only -t auth.users -t auth.identities \
+            -f "out/rivet-$STAMP-accounts.dump"
+          # A readable count per table, to check a restore against.
+          psql "$DATABASE_URL" -X -A -F ' ' -t -v ON_ERROR_STOP=1 -c "
+            select table_name, (xpath('/row/c/text()', query_to_xml(
+                     format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text
+            from information_schema.tables
+            where table_schema = 'public' and table_type = 'BASE TABLE' order by 1" > "out/rivet-$STAMP-counts.txt"
+          $PG/pg_restore --list "out/rivet-$STAMP.dump" > /dev/null
+          $PG/pg_restore --list "out/rivet-$STAMP-accounts.dump" > /dev/null
+          ls -l out
+      - name: Save the copy to Storage
+        run: python3 scripts/upload_backup.py co-files backups out/*
