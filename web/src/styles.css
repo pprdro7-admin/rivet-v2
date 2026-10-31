@@ -248,3 +248,68 @@ label.check { display: inline-flex; gap: 8px; align-items: center; }
   .report-table { font-size: 11px; }
   .scroll { overflow: visible !important; }
 }
+
+/* School page as rows (Sir Julius, Ada 2026-10-31): one row per building, View details opens it. */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #c5d0e0; background: #fff; color: var(--ink-2); font: 600 14px 'Public Sans', sans-serif; cursor: pointer; }
+.fchip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.tick { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.tick label { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.tick input, .sk-side input[type=checkbox] { width: 18px; min-height: 18px; height: 18px; }
+.linkbtn { background: none; border: 0; padding: 0; margin: 0 0 0 4px; color: var(--blue); text-decoration: underline; cursor: pointer; font: inherit; }
+table.rows { width: 100%; border-collapse: collapse; }
+table.rows .brow td { vertical-align: middle; }
+table.rows .brow.open td { background: var(--blue-soft); border-bottom-color: transparent; }
+table.rows .brow.gone td { color: var(--muted); }
+table.rows .bno { font-size: 15px; font-weight: 600; width: 48px; }
+table.rows .bname { font-weight: 600; }
+table.rows .right { text-align: right; white-space: nowrap; }
+table.rows tr.bdetail > td { background: #f8fafd; border-bottom: 2px solid var(--line); padding: 16px; }
+.bldg-detail { display: flex; flex-direction: column; gap: 12px; }
+.marks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.rep { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--gray-soft); border: 1px solid var(--line); color: var(--ink-2); }
+.rep.warn { background: var(--amber-soft); border-color: #f0d3a2; color: var(--amber); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
+.c-good { fill: #2f7d4f; background: #2f7d4f; }
+.c-minor { fill: #b7791f; background: #b7791f; }
+.c-major { fill: #c2410c; background: #c2410c; }
+.c-bad { fill: #9b1c13; background: #9b1c13; }
+.c-gone { fill: #8a94a3; background: #8a94a3; }
+.c-none { fill: #c5ccd6; background: #c5ccd6; }
+.replaces { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label.f.inline { flex-direction: row; align-items: center; gap: 8px; }
+label.f.inline select { width: auto; }
+dialog.rule { max-width: min(960px, 94vw); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+dialog.rule::backdrop { background: rgba(21, 35, 59, .55); }
+dialog.rule p { margin: 10px 0; }
+dialog.rule img { display: block; width: 100%; height: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Site sketch */
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid #c5d0e0; border-radius: 8px; overflow: hidden; }
+.seg button { min-height: 40px; padding: 0 14px; border: 0; background: #fff; color: var(--ink-2); font: 600 14px 'Public Sans', sans-serif; cursor: pointer; }
+.seg button.on { background: var(--navy); color: #fff; }
+.sketch { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; }
+@media (max-width: 800px) { .sketch { grid-template-columns: minmax(0, 1fr); } }
+svg.plan { width: 100%; height: auto; display: block; background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; touch-action: none; }
+svg.plan:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.sk-gridline { stroke: #e9edf2; }
+.sk-bound { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 10 6; }
+.sk-note { font-size: 12.5px; fill: var(--muted); }
+.sk-item rect { stroke: #fff; stroke-width: 2; }
+.sk-item.movable { cursor: grab; }
+.sk-item.sel rect { stroke: var(--ink); stroke-width: 3; }
+.sk-blabel { font: 700 14px 'Public Sans', sans-serif; fill: #fff; pointer-events: none; }
+.sk-mlabel { font: 600 12.5px 'Public Sans', sans-serif; fill: #fff; pointer-events: none; }
+.k-watsan { fill: #1f6f9a; background: #1f6f9a; }
+.k-court { fill: #5b4b8a; background: #5b4b8a; }
+.k-grounds { fill: #7fa86a; background: #7fa86a; }
+.k-gate, .k-flagpole, .k-other { fill: #4f5a6b; background: #4f5a6b; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.sk-side { display: flex; flex-direction: column; gap: 10px; }
+.sk-sel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sk-sel p { margin: 0; }
+.tray { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+.tray li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+table.rows td.num .small { white-space: nowrap; }
+svg.plan:focus:not(:focus-visible) { outline: none; }

@@ -4,6 +4,7 @@ import { CYCLE, SOURCE, n, pct, problem, STATUS } from '../lib/labels.js';
 import OtherNsbiData from '../components/OtherNsbiData.jsx';
 import { CoNotes, SendBack, loadSendBack } from '../components/Returns.jsx';
 import Relocation from '../components/Relocation.jsx';
+import SiteSketch from '../components/SiteSketch.jsx';
 
 // One school: every building with its rooms, the SDO's step on each, the school's updates waiting for
 // the SDO, new records, the DPO's check.
@@ -13,6 +14,10 @@ export default function School({ db, me, schoolId }) {
   const [error, setError] = useState(null);
   const [note, setNote] = useState(null);
   const [open, setOpen] = useState(null);   // 'b:<id>' or 'r:<id>': which record's step form is open
+  const [openB, setOpenB] = useState(null); // which building's details are showing
+  const [filter, setFilter] = useState('all');
+  const [showGone, setShowGone] = useState(false);
+  const [tab, setTab] = useState('list');
 
   const load = useCallback(async () => {
     const eqs = (t, sel = '*') => db.from(t).select(sel).eq('cycle_id', CYCLE).eq('school_id', schoolId);
@@ -25,17 +30,24 @@ export default function School({ db, me, schoolId }) {
       db.rpc('school_open_items', { p_cycle: CYCLE, p_school: schoolId }),
       eqs('school_updates'),
       eqs('school_relocation').maybeSingle(),
+      eqs('building_replaces'),
+      eqs('school_site_list').order('site_no'),
+      eqs('sketch_latest'),
+      db.rpc('next_building_no', { p_cycle: CYCLE, p_school: schoolId }),
     ]);
     const bad = res.find((r) => r.error);
     if (bad) { setError(bad.error); return; }
-    const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates, relocation] = res.map((r) => r.data);
+    const [tally, buildings, rooms, newBuildings, newRooms, openItems, updates, relocation, replaces, sites, sketch, nextNo] = res.map((r) => r.data);
+    const repOf = Object.fromEntries(replaces.map((x) => [x.building_no, x.replaces_no]));
+    buildings.forEach((b) => { b.replaces_no = repOf[b.building_no] ?? null; });
+    newBuildings.forEach((b) => { b.replaces_no = repOf[b.building_no] ?? null; });
     const [bf, rf, sendBack] = await Promise.all([
       db.from('building_flag_text').select('*').in('building_id', buildings.map((b) => b.building_id)),
       db.from('room_flag_text').select('*').in('room_id', rooms.map((r) => r.room_id)),
       loadSendBack(db, schoolId),
     ]);
     const flagsOf = (rows, key) => Object.fromEntries((rows.data || []).map((x) => [x[key], x.flags]));
-    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems, sendBack, relocation,
+    setData({ tally, buildings, rooms, newBuildings, newRooms, openItems, sendBack, relocation, sites, sketch, nextNo,
       updates: Object.fromEntries(updates.map((u) => [`${u.kind === 'building' ? 'b' : 'r'}:${u.record_id}`, u])),
       bflags: flagsOf(bf, 'building_id'), rflags: flagsOf(rf, 'room_id') });
   }, [db, schoolId]);
@@ -52,6 +64,18 @@ export default function School({ db, me, schoolId }) {
   if (!data.tally) return <main className="page"><ErrorNote error="This school is not in your SDO, or not in the NSBI 2025–2026 data." /></main>;
 
   const t = data.tally;
+  const gone = data.buildings.filter((b) => b.final_condition === 'Demolished').length
+    + data.newBuildings.filter((b) => b.building_condition === 'Demolished').length;
+  const demolished = [...data.buildings.map((b) => [b.building_no, b.final_condition]), ...data.newBuildings.map((b) => [b.building_no, b.building_condition])]
+    .filter(([, c]) => c === 'Demolished' || c === 'Condemned / For Demolition').map(([no]) => no).sort((a, b) => a - b);
+  const replacesLine = (no, cond, replacesNo) => (
+    <ReplacesLine db={db} schoolId={schoolId} no={no} cond={cond} replacesNo={replacesNo} demolished={demolished}
+      canEdit={isSDO} onDone={(m) => { setNote({ ok: m }); load(); }} onFail={fail} />
+  );
+  const showBuilding = (no) => { setTab('list'); setFilter('all'); setShowGone(true);
+    const c = data.buildings.find((b) => b.building_no === no);
+    const nb = data.newBuildings.find((b) => b.building_no === no);
+    setOpenB(c ? `c${c.building_id}` : nb ? `n${nb.id}` : null); };
   // Pilot: the DE and the DPO both record steps; a school account updates its own records.
   const isSDO = ['de', 'dpo'].includes(me.role) && me.sdo_code === t.sdo_code;
   const isSchool = me.role === 'school';
@@ -109,28 +133,43 @@ export default function School({ db, me, schoolId }) {
       {isSchool && (
         <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
       )}
+      <div className="tabs" role="tablist">
+        {[['list', 'Buildings and rooms'], ['sketch', 'Site sketch'], ['other', 'Other NSBI tables']].map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </div>
+      <NumberingRule />
+
+      {tab === 'list' && <>
       {isSDO && (
         <div className="btns">
           <button type="button" className="btn secondary" onClick={markRestCorrect}>Mark unflagged records without a status as Correct as is</button>
         </div>
       )}
 
-      {data.buildings.map((b) => {
+      <BuildingRows data={data} gone={gone} filter={filter} setFilter={setFilter} showGone={showGone} setShowGone={setShowGone}
+        openB={openB} setOpenB={setOpenB} newDetails={(nb) => (
+          <div className="bldg-detail">
+            <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span>
+              {nb.storeys && <span>{nb.storeys} storey(s)</span>}{nb.year_completed && <span>Completed {nb.year_completed}</span>}</div>
+            {replacesLine(nb.building_no, nb.building_condition, nb.replaces_no)}
+            <div className="small"><b>Remarks:</b> {nb.remarks}</div>
+            <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
+            {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} bldgLocked={locks(lists.bcond, nb.building_condition)} onDone={done} onFail={fail} />}
+          </div>
+        )} details={(b) => {
         const rooms = data.rooms.filter((r) => r.building_id === b.building_id);
         const newRooms = data.newRooms.filter((r) => r.building_id === b.building_id);
         const bldgLocked = locks(lists.bcond, b.final_condition);
         return (
-          <section key={b.building_id} className={`card${b.status === 'for_deletion' ? ' flagged' : ''}`}>
-            <div className="bldg-head">
-              <h2>Building {b.building_no} <span className="mono muted">{b.building_code}</span></h2>
-              <StatusChip status={b.status} />
-            </div>
+          <div className="bldg-detail">
             <div className="facts">
               <span>{b.building_type}</span>
               <span>Condition: <b>{b.final_condition}</b>{b.final_condition !== b.building_condition && <span className="co"> (NSBI: {b.building_condition ?? 'blank'})</span>}</span>
               <span>Tally: <b style={{ color: b.tally_check.startsWith('Changed') ? 'var(--red)' : undefined }}>{b.tally_check}</b></span>
               {b.final_longitude !== b.longitude && <span>Coordinates corrected: {b.final_longitude}, {b.final_latitude}</span>}
             </div>
+            {replacesLine(b.building_no, b.final_condition, b.replaces_no)}
             {data.bflags[b.building_id] && <div className="flags">{data.bflags[b.building_id]}</div>}
             {data.sendBack.notes[`building:${b.building_id}`] && <div className="note-row small"><b>Sent back:</b> {data.sendBack.notes[`building:${b.building_id}`]}</div>}
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
@@ -176,22 +215,19 @@ export default function School({ db, me, schoolId }) {
               </table>
             </div>
             {canEdit && <NewRoomForm db={db} lists={lists} building={b.building_id} bldgLocked={bldgLocked} onDone={done} onFail={fail} />}
-          </section>
+          </div>
         );
-      })}
+      }} />
 
-      {data.newBuildings.map((nb) => (
-        <section key={`nb${nb.id}`} className="card">
-          <div className="bldg-head"><h2>New building {nb.building_no}</h2><span className="chip blue">{nb.by_school ? 'Added by the school' : 'Not in the NSBI'}</span></div>
-          <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span></div>
-          <div className="small"><b>Remarks:</b> {nb.remarks}</div>
-          <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
-          {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} bldgLocked={locks(lists.bcond, nb.building_condition)} onDone={done} onFail={fail} />}
-        </section>
-      ))}
+      {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} nextNo={data.nextNo} demolished={demolished} canMarkReplaces={isSDO} onDone={done} onFail={fail} />}
+      </>}
 
-      {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} onDone={done} onFail={fail} />}
-      <OtherNsbiData db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => setNote({ ok: m })} />
+      {tab === 'sketch' && (
+        <SiteSketch db={db} schoolId={schoolId} data={data} canEdit={isSDO} onOpen={showBuilding}
+          onDone={() => load()} onFail={fail} />
+      )}
+
+      {tab === 'other' && <OtherNsbiData db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => setNote({ ok: m })} />}
       <CoNotes db={db} me={me} schoolId={schoolId} schoolSdo={t.sdo_code} />
       {(isDPO || me.role === 'ro' || me.role === 'co') && <DpoCheck db={db} schoolId={schoolId} openItems={data.openItems} canAct={isDPO} onDone={done} onFail={fail} />}
     </main>
@@ -387,27 +423,41 @@ function NewRoomForm({ db, lists, building, newBuilding, bldgLocked, onDone, onF
   );
 }
 
-function NewBuildingForm({ db, lists, schoolId, onDone, onFail }) {
+function NewBuildingForm({ db, lists, schoolId, nextNo, demolished, canMarkReplaces, onDone, onFail }) {
   const [show, setShow] = useState(false);
-  const [f, setF] = useState({ no: '', type: '', condition: '', storeys: '', year: '', remarks: '' });
+  const [f, setF] = useState({ no: '', type: '', condition: '', storeys: '', year: '', replaces: '', remarks: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  if (!show) return <div className="btns"><button type="button" className="btn secondary" onClick={() => setShow(true)}>Add a building not in the NSBI</button></div>;
+  if (!show) return <div className="btns"><button type="button" className="btn secondary" onClick={() => { setF({ ...f, no: String(nextNo ?? '') }); setShow(true); }}>Add a building not in the NSBI</button></div>;
   async function save(e) {
     e.preventDefault();
     const { error } = await db.rpc('add_new_building', { p_cycle: CYCLE, p_school: schoolId, p_building_no: Number(f.no),
       p_condition: f.condition, p_remarks: f.remarks, p_type: f.type || null, p_storeys: f.storeys ? Number(f.storeys) : null, p_year: f.year || null });
-    if (error) onFail(error); else { setShow(false); onDone('New building added. Now add its rooms.'); }
+    if (error) { onFail(error); return; }
+    if (f.replaces) {
+      const { error: e2 } = await db.rpc('record_building_replaces', { p_cycle: CYCLE, p_school: schoolId, p_building_no: Number(f.no), p_replaces_no: Number(f.replaces) });
+      if (e2) { onFail(e2); return; }
+    }
+    setShow(false);
+    onDone('New building added. Now add its rooms.');
   }
+  const offRule = f.no && nextNo && Number(f.no) !== nextNo;
   return (
     <form className="card" onSubmit={save}>
       <h2>New building (the building code stays blank until assigned in the NSBI)</h2>
       <div className="grid">
-        <label className="f">Building no. on site<input required inputMode="numeric" value={f.no} onChange={set('no')} /></label>
+        <label className="f">Building no.<input required inputMode="numeric" value={f.no} onChange={set('no')} /></label>
         <label className="f">Building type<input value={f.type} onChange={set('type')} /></label>
         <label className="f">Condition<select required value={f.condition} onChange={set('condition')}><option value="">Choose…</option>{lists.bcond.map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
         <label className="f">Storeys<input inputMode="numeric" value={f.storeys} onChange={set('storeys')} /></label>
         <label className="f">Year completed<input inputMode="numeric" value={f.year} onChange={set('year')} /></label>
+        {canMarkReplaces && demolished.length > 0 && (
+          <label className="f">Replaces a demolished building?
+            <select value={f.replaces} onChange={set('replaces')}><option value="">No</option>{demolished.map((d) => <option key={d} value={d}>Building {d}</option>)}</select>
+          </label>
+        )}
       </div>
+      <p className="small muted">The next number in this school is <b>{nextNo}</b>: a new building takes the last number in sequence, even where a demolished building stood. <button type="button" className="linkbtn" onClick={openNumbering}>How building numbers work</button></p>
+      {offRule && <div className="notice warn small"><span>CO's rule gives a new building number {nextNo}. Use another number only if this building already carries it on site.</span></div>}
       <label className="f">Remarks: why it is not in the NSBI<textarea rows={2} required value={f.remarks} onChange={set('remarks')} /></label>
       <div className="btns"><button type="submit" className="btn">Add building</button><button type="button" className="btn secondary" onClick={() => setShow(false)}>Cancel</button></div>
     </form>
@@ -476,4 +526,145 @@ function SchoolUpdate({ u, rec, rooms, kind, isSchool, canAccept, db, onDone, on
       )}
     </div>
   );
+}
+
+// Which kind of row a building is, for the filter chips: a school update waiting comes first.
+function rowKind(data, b) {
+  if (b.isNew) return 'new';
+  const rooms = data.rooms.filter((r) => r.building_id === b.building_id);
+  if (data.updates[`b:${b.building_id}`] || rooms.some((r) => data.updates[`r:${r.room_id}`])) return 'update';
+  return b.status ?? 'none';
+}
+const KINDS = [['none', 'No status yet'], ['correct', 'Correct as is'], ['corrected', 'With correction'],
+  ['for_deletion', 'For deletion'], ['update', 'Update from the school'], ['new', 'Not in the NSBI']];
+
+// One row per building (Sir Julius): number, type, condition, rooms and status on one line, and
+// View details opens the record, its step form and its rooms. Buildings added in RIVET are rows too.
+// Demolished buildings keep their record and number but stay out of the way unless asked for.
+function BuildingRows({ data, gone, filter, setFilter, showGone, setShowGone, openB, setOpenB, details, newDetails }) {
+  const all = [
+    ...data.buildings.map((b) => ({ ...b, key: `c${b.building_id}`, cond: b.final_condition })),
+    ...data.newBuildings.map((nb) => ({ ...nb, key: `n${nb.id}`, isNew: true, cond: nb.building_condition, src: nb })),
+  ].sort((a, b) => a.building_no - b.building_no || (a.isNew ? 1 : 0) - (b.isNew ? 1 : 0));
+  const kinds = Object.fromEntries(all.map((b) => [b.key, rowKind(data, b)]));
+  const flagged = (b) => !b.isNew && (!!data.bflags[b.building_id]
+    || data.rooms.some((r) => r.building_id === b.building_id && data.rflags[r.room_id]));
+  const count = (k) => all.filter((b) => (k === 'flag' ? flagged(b) : kinds[b.key] === k)).length;
+  const chips = [['all', 'All', all.length], ...KINDS.map(([k, l]) => [k, l, count(k)]), ['flag', 'With a flag', count('flag')]]
+    .filter(([k, , c]) => k === 'all' || c > 0 || k === filter);
+  const shown = all.filter((b) => (filter === 'all' || (filter === 'flag' ? flagged(b) : kinds[b.key] === filter))
+    && (showGone || filter !== 'all' || b.cond !== 'Demolished' || openB === b.key));
+  return (
+    <section className="card">
+      <div className="chips" role="group" aria-label="Show buildings">
+        {chips.map(([k, l, c]) => (
+          <button key={k} type="button" className={`fchip${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{l} ({c})</button>
+        ))}
+      </div>
+      {gone > 0 && (
+        <div className="tick small">
+          <label><input type="checkbox" checked={showGone} onChange={(e) => setShowGone(e.target.checked)} /> Show demolished buildings ({gone})</label>
+          <button type="button" className="linkbtn" onClick={openNumbering}>How building numbers work</button>
+        </div>
+      )}
+      <div className="scroll">
+        <table className="rows">
+          <thead><tr><th>No.</th><th>Building</th><th>Condition</th><th className="num">Rooms</th><th>Status</th><th /></tr></thead>
+          <tbody>
+            {shown.length === 0 && <tr><td colSpan={6} className="muted">No building fits this filter.</td></tr>}
+            {shown.map((b) => {
+              const isOpen = openB === b.key;
+              const k = kinds[b.key];
+              const rooms = b.isNew ? data.newRooms.filter((r) => r.new_building_id === b.id)
+                : data.rooms.filter((r) => r.building_id === b.building_id);
+              const withStatus = b.isNew ? null : rooms.filter((r) => r.status).length;
+              const replacedBy = all.find((x) => x.replaces_no === b.building_no);
+              return (
+                <React.Fragment key={b.key}>
+                  <tr className={`brow${isOpen ? ' open' : ''}${b.cond === 'Demolished' ? ' gone' : ''}`}>
+                    <td className="mono bno">{b.building_no}</td>
+                    <td><div className="bname">{b.building_type || 'Type not given'}</div>
+                      <span className="mono muted small">{b.isNew ? 'no code yet' : b.building_code}</span>
+                      <div className="marks">
+                        {b.replaces_no != null && <span className="rep">Replaces Bldg {b.replaces_no}</span>}
+                        {b.cond === 'Demolished' && <span className="rep gone">Number {b.building_no} retired{replacedBy ? ` · replaced by Bldg ${replacedBy.building_no}` : ''}</span>}
+                        {flagged(b) && <span className="rep warn">Flagged</span>}
+                      </div></td>
+                    <td data-label="Condition"><span className={`dot c-${condTone(b.cond)}`} />{b.cond ?? 'blank'}</td>
+                    <td data-label="Rooms" className="num">{rooms.length}{withStatus != null && <div className="small muted">{withStatus} with status</div>}</td>
+                    <td data-label="Status">{k === 'update' ? <span className="chip blue">Update from the school</span>
+                      : k === 'new' ? <span className="chip blue">{b.by_school ? 'Added by the school' : 'Not in the NSBI'}</span>
+                        : <StatusChip status={b.status} />}</td>
+                    <td className="right"><button type="button" className={`btn sm ${isOpen ? '' : 'secondary'}`} aria-expanded={isOpen}
+                      onClick={() => setOpenB(isOpen ? null : b.key)}>{isOpen ? 'Hide details' : 'View details'}</button></td>
+                  </tr>
+                  {isOpen && <tr className="bdetail"><td colSpan={6}>{b.isNew ? newDetails(b.src) : details(b)}</td></tr>}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+// "Replaces Bldg N": shown on the building, and set by the DE or DPO from the demolished buildings.
+function ReplacesLine({ db, schoolId, no, cond, replacesNo, demolished, canEdit, onDone, onFail }) {
+  const [edit, setEdit] = useState(false);
+  const [pick, setPick] = useState(replacesNo ?? '');
+  const choices = demolished.filter((d) => d !== no);
+  if (cond === 'Demolished') return null;
+  if (!edit) {
+    if (replacesNo == null && (!canEdit || choices.length === 0)) return null;
+    return (
+      <div className="small replaces">
+        {replacesNo != null && <>Replaces: <b>Building {replacesNo}</b> (demolished; its number is not reused)
+          <button type="button" className="linkbtn" onClick={openNumbering}>numbering rule</button></>}
+        {canEdit && <button type="button" className="linkbtn" onClick={() => setEdit(true)}>{replacesNo != null ? 'Change' : 'Mark as replacing a demolished building'}</button>}
+      </div>
+    );
+  }
+  async function save(value) {
+    const { error } = await db.rpc('record_building_replaces', { p_cycle: CYCLE, p_school: schoolId, p_building_no: no, p_replaces_no: value });
+    if (error) onFail(error); else { setEdit(false); onDone(value == null ? `Building ${no}: replaces mark cleared.` : `Building ${no} replaces Building ${value}.`); }
+  }
+  return (
+    <div className="btns small replaces">
+      <label className="f inline">Building {no} replaces
+        <select value={pick} onChange={(e) => setPick(e.target.value)}>
+          <option value="">Choose…</option>
+          {choices.map((d) => <option key={d} value={d}>Building {d}</option>)}
+        </select>
+      </label>
+      <button type="button" className="btn sm" disabled={!pick} onClick={() => save(Number(pick))}>Save</button>
+      {replacesNo != null && <button type="button" className="btn sm secondary" onClick={() => save(null)}>Clear</button>}
+      <button type="button" className="btn sm secondary" onClick={() => setEdit(false)}>Cancel</button>
+    </div>
+  );
+}
+
+function openNumbering() { document.getElementById('numbering')?.showModal(); }
+
+// CO's numbering rule, from its NSBI business-rule infographics.
+function NumberingRule() {
+  return (
+    <dialog id="numbering" className="rule" aria-labelledby="numbering-title">
+      <div className="spread"><h2 id="numbering-title">How building numbers work</h2>
+        <button type="button" className="btn sm secondary" onClick={() => document.getElementById('numbering').close()}>Close</button></div>
+      <p>A new building always takes the last number in sequence, wherever it stands. A demolished building
+        keeps its number, which is never given to another building (NSBI business rule).</p>
+      <img src="/img/numbering-between.webp" alt="A school has Buildings 1 to 5. A new building constructed between Buildings 3 and 4 is numbered 6, the last building sequence." loading="lazy" />
+      <img src="/img/numbering-demolished.webp" alt="A school has Buildings 1 to 10 and Building 5 is demolished. The new building on the same spot is numbered 11; number 5 is not reused." loading="lazy" />
+    </dialog>
+  );
+}
+
+function condTone(c) {
+  if (!c) return 'none';
+  if (c === 'Good Condition') return 'good';
+  if (c === 'Needs Minor Repair') return 'minor';
+  if (c === 'Needs Major Repair') return 'major';
+  if (c === 'Demolished') return 'gone';
+  return 'bad';
 }
