@@ -8,7 +8,7 @@ import { CoNotes, StateChip } from '../components/Returns.jsx';
 const SHOW = {
   all: ['All schools', () => true],
   todo: ['Not yet 100% validated', (s) => Number(s.share_validated) < 1],
-  check: ['Ready for the DPO check', (s) => Number(s.share_validated) === 1 && !s.dpo_complete],
+  check: ['100% validated, not yet marked Complete', (s) => Number(s.share_validated) === 1 && !s.dpo_complete],
   returned: ['Returned to DE', (s) => s.dpo_result === 'returned' && !s.dpo_complete],
   sentBack: ['Sent back to the school', (s, r) => !!r[s.school_id]],
   complete: ['Complete', (s) => s.dpo_complete],
@@ -58,9 +58,9 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
         <div className="tile"><strong>{pct(records ? withStatus / records : 0)}</strong>
           <span className="muted">of {n(records)} buildings and rooms have a status from the Engineer</span></div>
         <button type="button" className={`tile link${show === 'check' ? ' on' : ''}`} onClick={() => pick('check')}>
-          <strong>{n(count('check'))}</strong><span className="muted">schools 100% validated, waiting for the DPO check</span><span className="tile-act">Show these schools</span></button>
+          <strong>{n(count('check'))}</strong><span className="muted">schools 100% validated, waiting for the DPO to mark them Complete</span><span className="tile-act">Show these schools</span></button>
         <button type="button" className={`tile link${show === 'complete' ? ' on' : ''}`} onClick={() => pick('complete')}>
-          <strong>{n(count('complete'))} of {n(rows.length)}</strong><span className="muted">schools complete (checked by the DPO)</span><span className="tile-act">Show these schools</span></button>
+          <strong>{n(count('complete'))} of {n(rows.length)}</strong><span className="muted">schools marked Complete by the DPO</span><span className="tile-act">Show these schools</span></button>
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         Every building and room gets a status, not only the flagged ones. Schools are listed alphabetically.
@@ -77,7 +77,7 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
             <thead><tr>
               <th>School</th><th>District</th>
               <th className="num">Buildings NSBI → validated</th><th className="num">Rooms NSBI → validated</th>
-              <th className="num">Flagged rooms</th><th>With a status</th><th>DPO check</th>
+              <th className="num">Flagged rooms</th><th>With a status</th><th>Completion</th>
             </tr></thead>
             <tbody>
               {shown.slice(0, 300).map((s) => (
@@ -89,7 +89,7 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
                   <td className="num" data-label="Rooms NSBI → validated">{s.co_rooms} → <b style={{ color: s.rooms_after !== s.co_rooms ? 'var(--red)' : undefined }}>{s.rooms_after}</b></td>
                   <td className="num" data-label="Flagged rooms">{s.flagged_rooms || ''}</td>
                   <td data-label="With a status"><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
-                  <td data-label="DPO check">{s.dpo_complete ? <span className="chip green">Complete</span>
+                  <td data-label="Completion">{s.dpo_complete ? <span className="chip green">Complete</span>
                     : s.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : ''}
                     {returns[s.school_id] && <div style={{ marginTop: 4 }}>{returns[s.school_id] === 'open' ? <span className="chip amber">Sent back to school</span> : <StateChip state="answered" />}</div>}</td>
                 </tr>

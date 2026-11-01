@@ -54,7 +54,7 @@ export default function RegionProgress({ db, me }) {
       {note?.err && <ErrorNote error={note.err} />}
       <div className="today-top">
         <div className="tile"><strong>{pct(t.records ? t.withStatus / t.records : 0)}</strong><span className="muted">of {n(t.records)} buildings and rooms have a status from the Engineers</span></div>
-        <div className="tile"><strong>{n(t.done)}</strong><span className="muted">of {n(t.schools)} schools complete (DPO checked)</span></div>
+        <div className="tile"><strong>{n(t.done)}</strong><span className="muted">of {n(t.schools)} schools marked Complete by the DPO</span></div>
         <div className="tile"><strong>{t.signed}</strong><span className="muted">of {rows.length} SDOs signed off</span></div>
       </div>
       <div className="card">
