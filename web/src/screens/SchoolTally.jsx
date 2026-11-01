@@ -54,7 +54,6 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
   return (
     <main className="page">
       <h1>Validation{me.sdo_code ? '' : ` · ${sdoCode}`}</h1>
-      <WhoDoesWhat />
       <div className="today-top">
         <div className="tile"><strong>{pct(records ? withStatus / records : 0)}</strong>
           <span className="muted">of {n(records)} buildings and rooms have a status from the Engineer</span></div>
@@ -103,22 +102,5 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
       </div>
       <CoNotes db={db} me={me} sdoCode={sdoCode} />
     </main>
-  );
-}
-
-// Who does what, said where people look (Ada, 2026-11-01: a Regional Engineer asked who inputs,
-// and how "7 of 68 complete" and "11% validated" differ).
-export function WhoDoesWhat() {
-  return (
-    <details className="who-what">
-      <summary>Who does what, and what the numbers mean</summary>
-      <ul>
-        <li><b>Division Engineer:</b> gives every building and room a status (Correct as is, With correction, For deletion), after checking on site.</li>
-        <li><b>School head:</b> sends updates only if the DPO gave the school a RIVET account; the Engineer validates each update.</li>
-        <li><b>Division Planning Officer:</b> checks each school once it is 100% validated, and marks it <b>Complete</b> or returns it to the Engineer.</li>
-        <li><b>Regional Office:</b> signs off an SDO when all its schools are complete.</li>
-        <li><b>% with a status</b> counts buildings and rooms. <b>Schools complete</b> counts whole schools the DPO has checked, so the two move at different speeds.</li>
-      </ul>
-    </details>
   );
 }

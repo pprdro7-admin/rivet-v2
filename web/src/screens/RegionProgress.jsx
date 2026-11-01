@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct, problem } from '../lib/labels.js';
 import { CoNotes } from '../components/Returns.jsx';
-import { WhoDoesWhat } from './SchoolTally.jsx';
 
 // Regional Office home: where each SDO stands, sign-off, and freezing the cycle.
 export default function RegionProgress({ db, me }) {
@@ -50,7 +49,6 @@ export default function RegionProgress({ db, me }) {
   return (
     <main className="page">
       <h1>SY 2025–2026 validation, Region VII</h1>
-      <WhoDoesWhat />
       {cycle?.frozen_at && <div className="notice ok">Frozen on {new Date(cycle.frozen_at).toLocaleDateString('en-PH')}: this is the baseline for later NSBI reporting.</div>}
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}
