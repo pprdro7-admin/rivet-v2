@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct, problem } from '../lib/labels.js';
 import { CoNotes } from '../components/Returns.jsx';
+import { WhoDoesWhat } from './SchoolTally.jsx';
 
 // Regional Office home: where each SDO stands, sign-off, and freezing the cycle.
 export default function RegionProgress({ db, me }) {
@@ -49,11 +50,12 @@ export default function RegionProgress({ db, me }) {
   return (
     <main className="page">
       <h1>SY 2025–2026 validation, Region VII</h1>
+      <WhoDoesWhat />
       {cycle?.frozen_at && <div className="notice ok">Frozen on {new Date(cycle.frozen_at).toLocaleDateString('en-PH')}: this is the baseline for later NSBI reporting.</div>}
       {note?.ok && <div className="notice ok">{note.ok}</div>}
       {note?.err && <ErrorNote error={note.err} />}
       <div className="today-top">
-        <div className="tile"><strong>{pct(t.records ? t.withStatus / t.records : 0)}</strong><span className="muted">of {n(t.records)} buildings and rooms have a status</span></div>
+        <div className="tile"><strong>{pct(t.records ? t.withStatus / t.records : 0)}</strong><span className="muted">of {n(t.records)} buildings and rooms have a status from the Engineers</span></div>
         <div className="tile"><strong>{n(t.done)}</strong><span className="muted">of {n(t.schools)} schools complete (DPO checked)</span></div>
         <div className="tile"><strong>{t.signed}</strong><span className="muted">of {rows.length} SDOs signed off</span></div>
       </div>
@@ -62,7 +64,7 @@ export default function RegionProgress({ db, me }) {
           <table className="cards">
             <thead><tr>
               <th>SDO</th><th className="num">Schools</th><th className="num">Buildings</th><th className="num">Rooms</th>
-              <th className="num">Flagged rooms</th><th>Validated</th><th className="num">Schools complete</th><th className="num">Returned</th><th>Sign-off</th>
+              <th className="num">Flagged rooms</th><th>With a status</th><th className="num">Schools complete</th><th className="num">Returned</th><th>Sign-off</th>
             </tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -72,8 +74,9 @@ export default function RegionProgress({ db, me }) {
                   <td className="num" data-label="Buildings">{n(r.co_buildings)}</td>
                   <td className="num" data-label="Rooms">{n(r.co_rooms)}</td>
                   <td className="num" data-label="Flagged rooms">{n(r.flagged_rooms)}</td>
-                  <td data-label="Validated"><div className="stack" style={{ gap: 4 }}><span>{pct(r.share_validated)}</span><Bar share={r.share_validated} /></div></td>
-                  <td className="num" data-label="Schools complete">{n(r.schools_complete)}</td>
+                  <td data-label="With a status"><div className="stack" style={{ gap: 4 }}><span>{pct(r.share_validated)}</span><Bar share={r.share_validated} /></div></td>
+                  <td className="num" data-label="Schools complete" onClick={(e) => e.stopPropagation()}>
+                    <a href={`#/sdo/${r.sdo_code}?show=complete`} title="List the complete schools">{n(r.schools_complete)} of {n(r.schools)}</a></td>
                   <td className="num" data-label="Returned">{n(r.schools_returned)}</td>
                   <td data-label="Sign-off" onClick={(e) => e.stopPropagation()}>
                     {r.signed_at ? <span className="chip green">Signed off</span>

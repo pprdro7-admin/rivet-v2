@@ -15,11 +15,12 @@ const SHOW = {
 };
 
 // The School Tally sheet: per school, NSBI counts, validated counts, progress. Start here.
-export default function SchoolTally({ db, me, sdoCode }) {
+export default function SchoolTally({ db, me, sdoCode, initialShow }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [q, setQ] = useState('');
-  const [show, setShow] = useState(me.role === 'dpo' ? 'check' : 'todo');
+  const [show, setShow] = useState(SHOW[initialShow] ? initialShow : me.role === 'dpo' ? 'check' : 'todo');
+  useEffect(() => { if (SHOW[initialShow]) setShow(initialShow); }, [initialShow]);
   const [returns, setReturns] = useState({});
   const [moved, setMoved] = useState({});
 
@@ -46,20 +47,29 @@ export default function SchoolTally({ db, me, sdoCode }) {
   if (error) return <main className="page"><ErrorNote error={error} /></main>;
   if (!rows) return <main className="page"><Loading /></main>;
 
-  const done = rows.filter((s) => s.dpo_complete).length;
+  const count = (k) => rows.filter((s) => SHOW[k][1](s, returns)).length;
+  const records = rows.reduce((a, s) => a + Number(s.co_buildings) + Number(s.co_rooms), 0);
+  const withStatus = rows.reduce((a, s) => a + Number(s.buildings_with_status) + Number(s.rooms_with_status), 0);
+  const pick = (k) => { setShow(k); setQ(''); };
   return (
     <main className="page">
-      <div className="spread">
-        <h1>Validation{me.sdo_code ? "" : ` · ${sdoCode}`}</h1>
-        <span className="muted">{n(done)} of {n(rows.length)} schools complete</span>
+      <h1>Validation{me.sdo_code ? '' : ` · ${sdoCode}`}</h1>
+      <WhoDoesWhat />
+      <div className="today-top">
+        <div className="tile"><strong>{pct(records ? withStatus / records : 0)}</strong>
+          <span className="muted">of {n(records)} buildings and rooms have a status from the Engineer</span></div>
+        <button type="button" className={`tile link${show === 'check' ? ' on' : ''}`} onClick={() => pick('check')}>
+          <strong>{n(count('check'))}</strong><span className="muted">schools 100% validated, waiting for the DPO check</span><span className="tile-act">Show these schools</span></button>
+        <button type="button" className={`tile link${show === 'complete' ? ' on' : ''}`} onClick={() => pick('complete')}>
+          <strong>{n(count('complete'))} of {n(rows.length)}</strong><span className="muted">schools complete (checked by the DPO)</span><span className="tile-act">Show these schools</span></button>
       </div>
-      <p className="muted" style={{ margin: 0 }}>
+      <p className="muted small" style={{ margin: 0 }}>
         Every building and room gets a status, not only the flagged ones. Schools are listed alphabetically.
       </p>
       <div className="filters">
         <label className="f">Find a school<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, School ID or district" /></label>
         <label className="f">Show<select value={show} onChange={(e) => setShow(e.target.value)}>
-          {Object.entries(SHOW).map(([k, [label]]) => <option key={k} value={k}>{label}</option>)}
+          {Object.entries(SHOW).map(([k, [label]]) => <option key={k} value={k}>{label} ({n(count(k))})</option>)}
         </select></label>
       </div>
       <div className="card">
@@ -68,7 +78,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
             <thead><tr>
               <th>School</th><th>District</th>
               <th className="num">Buildings NSBI → validated</th><th className="num">Rooms NSBI → validated</th>
-              <th className="num">Flagged rooms</th><th>Validated</th><th>DPO check</th>
+              <th className="num">Flagged rooms</th><th>With a status</th><th>DPO check</th>
             </tr></thead>
             <tbody>
               {shown.slice(0, 300).map((s) => (
@@ -79,7 +89,7 @@ export default function SchoolTally({ db, me, sdoCode }) {
                   <td className="num" data-label="Buildings NSBI → validated">{s.co_buildings} → <b style={{ color: s.buildings_after !== s.co_buildings ? 'var(--red)' : undefined }}>{s.buildings_after}</b></td>
                   <td className="num" data-label="Rooms NSBI → validated">{s.co_rooms} → <b style={{ color: s.rooms_after !== s.co_rooms ? 'var(--red)' : undefined }}>{s.rooms_after}</b></td>
                   <td className="num" data-label="Flagged rooms">{s.flagged_rooms || ''}</td>
-                  <td data-label="Validated"><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
+                  <td data-label="With a status"><div className="stack" style={{ gap: 4 }}><span>{pct(s.share_validated)}</span><Bar share={s.share_validated} /></div></td>
                   <td data-label="DPO check">{s.dpo_complete ? <span className="chip green">Complete</span>
                     : s.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : ''}
                     {returns[s.school_id] && <div style={{ marginTop: 4 }}>{returns[s.school_id] === 'open' ? <span className="chip amber">Sent back to school</span> : <StateChip state="answered" />}</div>}</td>
@@ -93,5 +103,22 @@ export default function SchoolTally({ db, me, sdoCode }) {
       </div>
       <CoNotes db={db} me={me} sdoCode={sdoCode} />
     </main>
+  );
+}
+
+// Who does what, said where people look (Ada, 2026-11-01: a Regional Engineer asked who inputs,
+// and how "7 of 68 complete" and "11% validated" differ).
+export function WhoDoesWhat() {
+  return (
+    <details className="who-what">
+      <summary>Who does what, and what the numbers mean</summary>
+      <ul>
+        <li><b>Division Engineer:</b> gives every building and room a status (Correct as is, With correction, For deletion), after checking on site.</li>
+        <li><b>School head:</b> sends updates only if the DPO gave the school a RIVET account; the Engineer validates each update.</li>
+        <li><b>Division Planning Officer:</b> checks each school once it is 100% validated, and marks it <b>Complete</b> or returns it to the Engineer.</li>
+        <li><b>Regional Office:</b> signs off an SDO when all its schools are complete.</li>
+        <li><b>% with a status</b> counts buildings and rooms. <b>Schools complete</b> counts whole schools the DPO has checked, so the two move at different speeds.</li>
+      </ul>
+    </details>
   );
 }
