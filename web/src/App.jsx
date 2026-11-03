@@ -7,6 +7,7 @@ import SignIn from './screens/SignIn.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import SchoolTally from './screens/SchoolTally.jsx';
 import RegionProgress from './screens/RegionProgress.jsx';
+import NsbiForm from './screens/NsbiForm.jsx';
 import School from './screens/School.jsx';
 import SchoolAccess from './screens/SchoolAccess.jsx';
 import Reports from './screens/Reports.jsx';
@@ -64,6 +65,7 @@ export default function App() {
   else if (me.active === false) page = <div className="page"><div className="notice warn">This account no longer has access to RIVET. If you still need it, ask your Division Planning Officer.</div></div>;
   else if (route === '#/password') page = <ChangePassword me={me} />;
   else if (me.role === 'school') page = <School db={db} me={me} schoolId={me.school_id} />;
+  else if (route.startsWith('#/form/')) page = <NsbiForm db={db} me={me} schoolId={route.slice('#/form/'.length).split('?')[0]} preview={new URLSearchParams(route.split('?')[1] || '').get('preview') === '1'} />;
   else if (route.startsWith('#/school/')) page = <School db={db} me={me} schoolId={route.slice('#/school/'.length)} />;
   else if (route === '#/dashboard') page = <Dashboard db={db} me={me} />;
   else if (route === '#/reports') page = <Reports db={db} me={me} />;
