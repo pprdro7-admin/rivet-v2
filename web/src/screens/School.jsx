@@ -4,7 +4,7 @@ import { CYCLE, SOURCE, n, pct, problem, STATUS } from '../lib/labels.js';
 import OtherNsbiData from '../components/OtherNsbiData.jsx';
 import { CoNotes, SendBack, loadSendBack } from '../components/Returns.jsx';
 import Relocation from '../components/Relocation.jsx';
-import SiteSketch from '../components/SiteSketch.jsx';
+import SiteSketch, { MiniSketch } from '../components/SiteSketch.jsx';
 
 // One school: every building with its rooms, the SDO's step on each, the school's updates waiting for
 // the SDO, new records, the DPO's check.
@@ -111,6 +111,7 @@ export default function School({ db, me, schoolId }) {
             <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span>
               {nb.storeys && <span>{nb.storeys} storey(s)</span>}{nb.year_completed && <span>Completed {nb.year_completed}</span>}</div>
             {replacesLine(nb.building_no, nb.building_condition, nb.replaces_no)}
+            <MiniSketch db={db} schoolId={schoolId} data={data} no={nb.building_no} />
             <div className="small"><b>Remarks:</b> {nb.remarks}</div>
             <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
             {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} bldgLocked={locks(lists.bcond, nb.building_condition)} onDone={done} onFail={fail} />}
@@ -129,6 +130,7 @@ export default function School({ db, me, schoolId }) {
               {b.final_longitude !== b.longitude && <span>Coordinates corrected: {b.final_longitude}, {b.final_latitude}</span>}
             </div>
             {replacesLine(b.building_no, b.final_condition, b.replaces_no)}
+            <MiniSketch db={db} schoolId={schoolId} data={data} no={b.building_no} />
             {data.bflags[b.building_id] && <div className="flags">{data.bflags[b.building_id]}</div>}
             {data.sendBack.notes[`building:${b.building_id}`] && <div className="note-row small"><b>Sent back:</b> {data.sendBack.notes[`building:${b.building_id}`]}</div>}
             {b.remarks && <div className="small"><b>Remarks:</b> {b.remarks}</div>}
