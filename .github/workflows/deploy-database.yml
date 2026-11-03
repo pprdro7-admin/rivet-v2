@@ -26,7 +26,7 @@ jobs:
       - name: Apply new migrations
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: supabase db push --db-url "$SUPABASE_DB_URL"
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes   # newer CLI asks to confirm; a workflow cannot answer
       - name: Load the sample accounts
         if: ${{ inputs.load_sample_accounts }}
         env:
