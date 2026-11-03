@@ -313,9 +313,9 @@ svg.plan.fence-editing .sk-item { pointer-events: none; opacity: 0.45; }
 .sk-blabel { font: 700 14px 'Public Sans', sans-serif; fill: #fff; pointer-events: none; }
 .sk-mlabel { font: 600 12.5px 'Public Sans', sans-serif; fill: #fff; pointer-events: none; }
 .k-watsan { fill: #1f6f9a; background: #1f6f9a; }
-.k-court { fill: #5b4b8a; background: #5b4b8a; }
-.k-grounds { fill: #7fa86a; background: #7fa86a; }
-.k-gate, .k-flagpole, .k-other { fill: #4f5a6b; background: #4f5a6b; }
+.k-court, .k-gym { fill: #5b4b8a; background: #5b4b8a; }
+.k-grounds, .k-garden, .k-playground { fill: #7fa86a; background: #7fa86a; }
+.k-gate, .k-flagpole, .k-other, .k-guardhouse, .k-canteen, .k-stage, .k-water_tank, .k-parking, .k-pathway { fill: #4f5a6b; background: #4f5a6b; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; color: var(--ink-2); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 .sk-side { display: flex; flex-direction: column; gap: 10px; }

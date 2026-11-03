@@ -9,8 +9,11 @@ const W = 800;
 const H = 460;
 const GRID = 10;
 const LANDMARKS = [
-  ['watsan', 'WATSAN', 70, 40], ['court', 'Covered court', 150, 100], ['grounds', 'Open grounds', 200, 120],
-  ['gate', 'Gate', 60, 30], ['flagpole', 'Flagpole', 40, 40], ['other', 'Other', 80, 50],
+  ['watsan', 'WATSAN', 70, 40], ['court', 'Covered court', 150, 100], ['gym', 'Gymnasium', 160, 100],
+  ['grounds', 'Open grounds', 200, 120], ['playground', 'Playground', 110, 70], ['garden', 'Garden', 110, 70],
+  ['guardhouse', 'Guardhouse', 100, 40], ['gate', 'Gate', 60, 30], ['flagpole', 'Flagpole', 40, 40],
+  ['stage', 'Stage', 100, 50], ['canteen', 'Canteen', 90, 50], ['water_tank', 'Water tank', 50, 50],
+  ['parking', 'Parking', 120, 60], ['pathway', 'Pathway / walk', 200, 30], ['other', 'Other', 80, 50],
 ];
 const KIND_LABEL = Object.fromEntries(LANDMARKS.map(([k, l]) => [k, l]));
 
@@ -46,6 +49,7 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
   const [state, setState] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [fences, setFences] = useState({});
+  const [lm, setLm] = useState('watsan');
   const [fe, setFe] = useState(null); // fence being drawn: { pts, open, closed }
   const fdrag = useRef(null);
   useEffect(() => {
@@ -117,9 +121,10 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
   async function addLandmark(kind) {
     const [, label, w, h] = LANDMARKS.find((l) => l[0] === kind);
     let name = label;
-    if (kind === 'other') { name = window.prompt('What is it? (e.g. Canteen, Stage, Water tank)'); if (!name) return; }
+    if (kind === 'other') { name = window.prompt('What is it? (e.g. Clinic, Shed, Nursery)'); if (!name) return; }
     const next = Math.max(0, ...Object.keys(items).filter((k) => k.startsWith('m:')).map((k) => Number(k.slice(2)))) + 1;
-    const ok = await put({ item_key: `m:${next}`, kind, label: name, site_no: site, x: 20, y: H - 30 - h, w, h });
+    const n = here.filter((i) => i.kind !== 'building').length; // staggered, so a new landmark does not hide the last one
+    const ok = await put({ item_key: `m:${next}`, kind, label: name, site_no: site, x: Math.min(W - w, 30 + (n % 6) * 90), y: Math.max(0, H - 30 - h - (n % 3) * 40), w, h });
     if (ok) setSel(`m:${next}`);
   }
   async function addSite() {
@@ -307,7 +312,7 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
             <span><i className="c-good" />Good</span><span><i className="c-minor" />Minor repair</span><span><i className="c-major" />Major repair</span>
             <span><i className="c-bad" />Condemnation / construction</span><span><i className="c-gone" />Demolished</span>
             <span><i className="fence" />Fence</span><span><i className="fence open" />No fence yet</span>
-            <span><i className="k-watsan" />WATSAN</span><span><i className="k-court" />Covered court</span><span><i className="k-grounds" />Grounds</span>
+            <span><i className="k-watsan" />WATSAN</span><span><i className="k-court" />Court / gym</span><span><i className="k-grounds" />Grounds / garden</span><span><i className="k-other" />Other landmarks</span>
           </div>
         </div>
 
@@ -354,7 +359,12 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
           {canEdit && (
             <>
               <h3>Add a landmark</h3>
-              <div className="btns">{LANDMARKS.map(([k, l]) => <button key={k} type="button" className="btn sm secondary" onClick={() => addLandmark(k)}>{l}</button>)}</div>
+              <div className="btns" style={{ flexWrap: 'nowrap' }}>
+                <select aria-label="Landmark" value={lm} onChange={(e) => setLm(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+                  {LANDMARKS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+                <button type="button" className="btn sm secondary" onClick={() => addLandmark(lm)}>Add</button>
+              </div>
             </>
           )}
           <p className="small muted">Only the place of each box is new. Number, type and condition come from Tables 1 and 2 and change there.</p>

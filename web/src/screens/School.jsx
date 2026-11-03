@@ -15,6 +15,7 @@ export default function School({ db, me, schoolId }) {
   const [note, setNote] = useState(null);
   const [open, setOpen] = useState(null);   // 'b:<id>' or 'r:<id>': which record's step form is open
   const [openB, setOpenB] = useState(null); // which building's details are showing
+  const [sketchB, setSketchB] = useState(null); // building opened from the sketch
   const [filter, setFilter] = useState('all');
   const [showGone, setShowGone] = useState(false);
   const [tab, setTab] = useState('list');
@@ -105,50 +106,7 @@ export default function School({ db, me, schoolId }) {
     done(`${count} record(s) marked Correct as is.`);
   }
 
-  return (
-    <main className="page">
-      {!isSchool && <a href={`#/sdo/${t.sdo_code}`} className="small">← Validation</a>}
-      <div className="spread">
-        <div><h1>{t.school_name}</h1><span className="mono muted">{t.school_id} · {t.district}</span><div className="small muted">{SOURCE}, with the SDO's validation</div></div>
-        {t.dpo_complete ? <span className="chip green">Complete</span>
-          : t.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : null}
-      </div>
-
-      <div className="today-top">
-        <div className="tile"><strong>{pct(t.share_validated)}</strong><span className="muted">validated ({n(t.buildings_with_status + t.rooms_with_status)} of {n(t.co_buildings + t.co_rooms)})</span></div>
-        <div className="tile"><strong>{t.co_buildings} → {t.buildings_after}</strong><span className="muted">buildings, NSBI → validated</span></div>
-        <div className="tile"><strong>{t.co_rooms} → {t.rooms_after}</strong><span className="muted">rooms, NSBI → validated</span></div>
-        <div className="tile"><strong>{t.co_instructional_rooms} → {t.instructional_rooms_after}</strong><span className="muted">instructional rooms</span></div>
-      </div>
-
-      {t.dpo_result === 'returned' && !t.dpo_complete && <div className="notice warn"><b>Returned by the DPO:</b> {t.dpo_remarks}</div>}
-      {note?.ok && <div className="notice ok">{note.ok}</div>}
-      {note?.err && <ErrorNote error={note.err} />}
-
-      <Relocation db={db} schoolId={schoolId} relocation={data.relocation} isSDO={isSDO} onDone={(m) => { setNote({ ok: m }); load(); }} />
-
-      <SendBack db={db} schoolId={schoolId} sendBack={data.sendBack} buildings={data.buildings} rooms={data.rooms}
-        isSDO={isSDO} isSchool={isSchool} onDone={(m) => { setNote({ ok: m }); load(); }} />
-
-      {isSchool && (
-        <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
-      )}
-      <div className="tabs" role="tablist">
-        {[['list', 'Buildings and rooms'], ['sketch', 'Site sketch'], ['other', 'Other NSBI tables']].map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
-        ))}
-      </div>
-      <NumberingRule />
-
-      {tab === 'list' && <>
-      {isSDO && (
-        <div className="btns">
-          <button type="button" className="btn secondary" onClick={markRestCorrect}>Mark unflagged records without a status as Correct as is</button>
-        </div>
-      )}
-
-      <BuildingRows data={data} gone={gone} filter={filter} setFilter={setFilter} showGone={showGone} setShowGone={setShowGone}
-        openB={openB} setOpenB={setOpenB} newDetails={(nb) => (
+  const nbDetails = (nb) => (
           <div className="bldg-detail">
             <div className="facts"><span>{nb.building_type}</span><span>Condition: <b>{nb.building_condition}</b></span>
               {nb.storeys && <span>{nb.storeys} storey(s)</span>}{nb.year_completed && <span>Completed {nb.year_completed}</span>}</div>
@@ -157,7 +115,8 @@ export default function School({ db, me, schoolId }) {
             <table className="cards"><tbody>{data.newRooms.filter((r) => r.new_building_id === nb.id).map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}</tbody></table>
             {canEdit && <NewRoomForm db={db} lists={lists} newBuilding={nb.id} bldgLocked={locks(lists.bcond, nb.building_condition)} onDone={done} onFail={fail} />}
           </div>
-        )} details={(b) => {
+        );
+  const bDetails = (b) => {
         const rooms = data.rooms.filter((r) => r.building_id === b.building_id);
         const newRooms = data.newRooms.filter((r) => r.building_id === b.building_id);
         const bldgLocked = locks(lists.bcond, b.final_condition);
@@ -217,15 +176,78 @@ export default function School({ db, me, schoolId }) {
             {canEdit && <NewRoomForm db={db} lists={lists} building={b.building_id} bldgLocked={bldgLocked} onDone={done} onFail={fail} />}
           </div>
         );
-      }} />
+  };
+  // From the sketch, a building's details open folded under the sketch, one at a time (Ada, 2026-11-03).
+  const sketchRec = sketchB == null ? null : data.buildings.find((b) => b.building_no === sketchB)
+    ? { b: data.buildings.find((b) => b.building_no === sketchB) } : { nb: data.newBuildings.find((b) => b.building_no === sketchB) };
+
+  return (
+    <main className="page">
+      {!isSchool && <a href={`#/sdo/${t.sdo_code}`} className="small">← Validation</a>}
+      <div className="spread">
+        <div><h1>{t.school_name}</h1><span className="mono muted">{t.school_id} · {t.district}</span><div className="small muted">{SOURCE}, with the SDO's validation</div></div>
+        {t.dpo_complete ? <span className="chip green">Complete</span>
+          : t.dpo_result === 'returned' ? <span className="chip amber">Returned to DE</span> : null}
+      </div>
+
+      <div className="today-top">
+        <div className="tile"><strong>{pct(t.share_validated)}</strong><span className="muted">validated ({n(t.buildings_with_status + t.rooms_with_status)} of {n(t.co_buildings + t.co_rooms)})</span></div>
+        <div className="tile"><strong>{t.co_buildings} → {t.buildings_after}</strong><span className="muted">buildings, NSBI → validated</span></div>
+        <div className="tile"><strong>{t.co_rooms} → {t.rooms_after}</strong><span className="muted">rooms, NSBI → validated</span></div>
+        <div className="tile"><strong>{t.co_instructional_rooms} → {t.instructional_rooms_after}</strong><span className="muted">instructional rooms</span></div>
+      </div>
+
+      {t.dpo_result === 'returned' && !t.dpo_complete && <div className="notice warn"><b>Returned by the DPO:</b> {t.dpo_remarks}</div>}
+      {note?.ok && <div className="notice ok">{note.ok}</div>}
+      {note?.err && <ErrorNote error={note.err} />}
+
+      <Relocation db={db} schoolId={schoolId} relocation={data.relocation} isSDO={isSDO} onDone={(m) => { setNote({ ok: m }); load(); }} />
+
+      <SendBack db={db} schoolId={schoolId} sendBack={data.sendBack} buildings={data.buildings} rooms={data.rooms}
+        isSDO={isSDO} isSchool={isSchool} onDone={(m) => { setNote({ ok: m }); load(); }} />
+
+      {isSchool && (
+        <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
+      )}
+      <div className="tabs" role="tablist">
+        {[['list', 'Buildings and rooms'], ['sketch', 'Site sketch'], ['other', 'Other NSBI tables']].map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </div>
+      <NumberingRule />
+
+      {tab === 'list' && <>
+      {isSDO && (
+        <div className="btns">
+          <button type="button" className="btn secondary" onClick={markRestCorrect}>Mark unflagged records without a status as Correct as is</button>
+        </div>
+      )}
+
+      <BuildingRows data={data} gone={gone} filter={filter} setFilter={setFilter} showGone={showGone} setShowGone={setShowGone}
+        openB={openB} setOpenB={setOpenB} newDetails={nbDetails} details={bDetails} />
 
       {canEdit && <NewBuildingForm db={db} lists={lists} schoolId={schoolId} nextNo={data.nextNo} demolished={demolished} canMarkReplaces={isSDO} onDone={done} onFail={fail} />}
       </>}
 
       {tab === 'sketch' && (
-        <SiteSketch db={db} schoolId={schoolId} data={data} canEdit={canEdit} canConfirm={isSDO && canEdit} isSchool={isSchool} onOpen={showBuilding}
+        <SiteSketch db={db} schoolId={schoolId} data={data} canEdit={canEdit} canConfirm={isSDO && canEdit} isSchool={isSchool} onOpen={(no) => { setSketchB(no); setTimeout(() => document.getElementById('sketch-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
           onDone={() => load()} onFail={fail} />
       )}
+      {tab === 'sketch' && sketchRec && (sketchRec.b || sketchRec.nb) && (() => {
+        const x = sketchRec.b || sketchRec.nb;
+        return (
+          <section className="card" id="sketch-detail">
+            <div className="spread">
+              <h3 style={{ margin: 0 }}>Building {x.building_no} · {x.building_type || 'Type not given'}</h3>
+              <div className="btns">
+                <button type="button" className="btn sm secondary" onClick={() => showBuilding(x.building_no)}>Open in Table 1 list</button>
+                <button type="button" className="btn sm" onClick={() => setSketchB(null)}>Hide details</button>
+              </div>
+            </div>
+            {sketchRec.b ? bDetails(sketchRec.b) : nbDetails(sketchRec.nb)}
+          </section>
+        );
+      })()}
 
       {tab === 'other' && <OtherNsbiData db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => setNote({ ok: m })} />}
       <CoNotes db={db} me={me} schoolId={schoolId} schoolSdo={t.sdo_code} />
