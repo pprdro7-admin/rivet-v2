@@ -42,8 +42,7 @@ export default function SignIn({ onSignedIn }) {
       <div className="card" style={{ gap: 16 }}>
         <h1>Sign in to RIVET</h1>
         <p style={{ margin: 0 }}>
-          For schools, Division Engineers, Division Planning Officers, the Regional Office and the Central Office. A school sees
-          its own School ID; SDO staff see the schools of their SDO. The record belongs to each School ID, so it stays when people move.
+          For schools, Division Engineers, Division Planning Officers and the Regional Office.
         </p>
         {!isLocal && (
           <form className="stack" onSubmit={submit}>

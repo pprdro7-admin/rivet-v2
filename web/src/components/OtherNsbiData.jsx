@@ -212,9 +212,7 @@ export default function OtherNsbiData({ db, schoolId, canEdit, isSchool, isSDO, 
     <section className="stack" style={{ gap: 12 }}>
       <h2>Other tables of the SY 2025–2026 template</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        The NSBI has no SY 2025–2026 data yet for Tables 3 to 7, so each starts blank. The SDO fills in what it has;
-        a school's entry waits for the SDO. Where the NSBI has an earlier school year, its value is shown under each item for
-        reference only and is not copied in.
+        Update each table as of 31 May 2026. An earlier school year's value, where there is one, is shown under each item for reference.
       </p>
       {shown.map((s) => (
         <React.Fragment key={s.table}>

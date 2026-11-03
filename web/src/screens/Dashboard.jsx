@@ -68,7 +68,6 @@ export default function Dashboard({ db, me }) {
           )}
         </div>
       </div>
-      {years.length < 2 && <p className="small muted">Earlier school years appear here once their NSBI tables are loaded.</p>}
       {!data ? <Loading /> : y?.has_buildings ? <ValidationView db={db} data={data} label={y.label} year={year} sdo={sdo} isRegion={isRegion} sdos={sdos} /> : <SchoolTablesView data={data} label={y?.label} />}
     </main>
   );
@@ -92,7 +91,7 @@ function ValidationView({ db, data, label, year, sdo, isRegion, sdos }) {
 
   return (
     <>
-      <p className="small muted">NSBI {label} (as of 31 May 2026), beside the validated record. A building or room without a status yet keeps its NSBI value.</p>
+      <p className="small muted">NSBI {label} (as of 31 May 2026), beside the validated record.</p>
       <div className="grid tiles">
         <Tile big={n(p.schools)} text={`schools · ${n(p.done)} complete`} />
         <Tile big={pct(p.records ? p.withStatus / p.records : 0)} text="of buildings and rooms validated" />
@@ -231,7 +230,6 @@ function SchoolTablesView({ data, label }) {
             </tbody>
           </table>
         </div>
-        <p className="small muted">CO counts a room shared by two levels as part of each, so room counts are rounded to whole rooms.</p>
       </section>
     </>
   );
@@ -314,7 +312,7 @@ function Gap({ rows, isRegion, sdos }) {
   return (
     <>
       <h2 className="section-h">Classroom gap</h2>
-      {!source ? <div className="notice info">The classroom gap needs enrollment by grade. It appears once LIS enrollment is loaded.</div> : (
+      {!source ? <div className="notice info">The classroom gap appears once enrollment data is available.</div> : (
         <>
           <p className="small muted">
             Classrooms needed under the MATATAG class sizes (Kindergarten 30 a session, two sessions a room; Grades 1–3, 35; Grades 4–6 and 7–10, 45; Grades 11–12, 40),

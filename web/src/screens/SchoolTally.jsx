@@ -64,7 +64,7 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
           <strong>{n(count('complete'))} of {n(rows.length)}</strong><span className="muted">schools marked Complete by the DPO</span><span className="tile-act">Show these schools</span></button>
       </div>
       <p className="muted small" style={{ margin: 0 }}>
-        Every building and room gets a status, not only the flagged ones. Schools are listed alphabetically.
+        Every building and room gets a status, not only the flagged ones.
       </p>
       <div className="filters">
         <label className="f">Find a school<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, School ID or district" /></label>

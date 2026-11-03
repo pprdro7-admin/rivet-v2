@@ -127,7 +127,7 @@ export default function SchoolAccess({ db, me }) {
               </div>
             </label>
           </div>
-          <p className="small muted">At least 8 characters, with letters and numbers. The person can keep using it for the pilot; ask them not to share it.</p>
+          <p className="small muted">At least 8 characters, with letters and numbers. Ask them not to share it.</p>
           <div className="btns">
             <button type="submit" className="btn" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
             <button type="button" className="btn secondary" onClick={() => setForm(null)}>Cancel</button>

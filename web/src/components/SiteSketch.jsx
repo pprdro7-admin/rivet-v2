@@ -367,7 +367,6 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
               </div>
             </>
           )}
-          <p className="small muted">Only the place of each box is new. Number, type and condition come from Tables 1 and 2 and change there.</p>
         </aside>
       </div>
     </section>

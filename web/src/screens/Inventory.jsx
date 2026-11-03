@@ -37,8 +37,7 @@ export default function Inventory({ db, me }) {
     <main className="page">
       <h1>Infrastructure Inventory</h1>
       <p className="muted" style={{ margin: 0 }}>
-        Each school's buildings and rooms as validated in RIVET (NSBI 2025–2026 as of 31 May 2026, with the SDO's validation so far).
-        Open a school to see every building, room and step recorded.
+        Each school's buildings and rooms, NSBI 2025–2026 as of 31 May 2026 with the validation so far. Open a school to see its details.
       </p>
       <div className="filters">
         <label className="f">Find a school<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or School ID" /></label>
