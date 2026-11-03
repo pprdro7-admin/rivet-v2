@@ -373,10 +373,3 @@ table.watsan th:first-child { text-align: left; }
 table.watsan td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.watsan td:first-child { min-width: 190px; }
 table.watsan tr.total td { border-top: 2px solid var(--line); }
-
-/* Mini site sketch in a building's details */
-.mini-sketch summary { cursor: pointer; color: var(--blue); font-weight: 600; }
-.mini-sketch[open] summary { margin-bottom: 8px; }
-svg.plan.mini { max-width: 520px; }
-svg.plan.mini .sk-item.dim { opacity: 0.35; }
-svg.plan.mini .sk-item.here rect { stroke: #f5b800; stroke-width: 6; }
