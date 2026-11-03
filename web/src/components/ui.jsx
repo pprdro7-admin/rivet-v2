@@ -49,7 +49,7 @@ export function Header({ me, route, onSignOut }) {
           </nav>
           {me && (
             <div className="who">
-              <span>{me.full_name} · {me.office && me.role === 'co' ? 'View only' : ROLE[me.role]}</span>
+              <span>{me.full_name} · {me.office && me.role === 'co' ? (/^ESSD/i.test(me.office) ? 'Clears Divisions' : 'View only') : ROLE[me.role]}</span>
               <a href="#/password">Change password</a>
               <button type="button" onClick={onSignOut}>Sign out</button>
             </div>

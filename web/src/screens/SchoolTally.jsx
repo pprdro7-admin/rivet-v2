@@ -4,6 +4,7 @@ import { CYCLE, n, pct } from '../lib/labels.js';
 import { RELOCATION } from '../components/Relocation.jsx';
 import { fetchAll } from '../lib/fetchAll.js';
 import { CoNotes, StateChip } from '../components/Returns.jsx';
+import AddSchool from '../components/AddSchool.jsx';
 
 const SHOW = {
   all: ['All schools', () => true],
@@ -100,6 +101,7 @@ export default function SchoolTally({ db, me, sdoCode, initialShow }) {
         {shown.length > 300 && <p className="muted small">Showing 300 of {n(shown.length)}. Search to narrow the list.</p>}
         {shown.length === 0 && <p className="muted">No schools in this list.</p>}
       </div>
+      {me.role === 'dpo' && me.sdo_code === sdoCode && <AddSchool db={db} />}
       <CoNotes db={db} me={me} sdoCode={sdoCode} />
     </main>
   );

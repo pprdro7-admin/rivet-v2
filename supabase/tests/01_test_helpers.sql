@@ -15,6 +15,7 @@ language sql as $$
     when 'admin'   then '6'
     when 'school'  then '7'   -- the account of school 900001 (Bohol)
     when 'co'      then '8'   -- Central Office viewer
+    when 'essd'    then '9'   -- ESSD Engineer of the Region (clears a Division)
   end), false)
 $$;
 

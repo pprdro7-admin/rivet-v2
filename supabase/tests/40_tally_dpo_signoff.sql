@@ -60,9 +60,9 @@ select tests.ok(not (select dpo_complete from school_tally where school_id = '90
 select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900001', 'complete');
 
--- RO sign-off.
-select tests.login('ro');
-select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '23514', 'an SDO cannot be signed off while a school is not complete');
+-- The Region (ESSD Engineers) clears the Division.
+select tests.login('essd');
+select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '23514', 'a Division cannot be cleared while a school is not complete');
 select tests.login('de');
 select record_building_validation(tests.b('900002001'), null, 'correct');
 select record_building_validation(tests.b('900002002'), null, 'for_deletion', p_reason => 'mistaken');
@@ -70,9 +70,23 @@ select record_room_validation(tests.r('900002001001'), null, 'corrected', p_usag
 select record_building_watsan('SY2025-2026', '900002', 1, null, '{"toilet_male":1,"toilet_female":1}');
 select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900002', 'complete');
-select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '42501', 'only the RO signs off an SDO');
+select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '42501', 'a DPO does not clear a Division');
 select tests.login('ro');
+select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '42501', 'PPRD does not clear a Division; the ESSD Engineers do');
+select tests.login('essd');
 select sign_off_sdo('SY2025-2026', 'BOH', 'Certification received');
+select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '23514', 'a Division is cleared once');
+select tests.fails('select undo_sdo_clearance(''SY2025-2026'', ''BOH'', ''Wrong Division cleared'')', '42501', 'ESSD does not undo a clearance');
+select tests.login('ro');
+select tests.fails('select undo_sdo_clearance(''SY2025-2026'', ''BOH'', ''oops'')', '23514', 'undoing a clearance needs a reason');
+select undo_sdo_clearance('SY2025-2026', 'BOH', 'School 900002 asked to correct a room');
+select tests.ok(not exists (select 1 from sdo_signoffs where sdo_code = 'BOH')
+                and (select undo_reason from sdo_clearance_history where sdo_code = 'BOH') like 'School 900002%',
+                'PPRD undoes a clearance with a reason, kept on record');
+select tests.login('essd');
+select sign_off_sdo('SY2025-2026', 'BOH', 'Certification received again');
+select tests.ok((select count(*) from sdo_clearance_history where sdo_code = 'BOH') = 2, 'the Division can be cleared again');
+select tests.login('ro');
 select tests.login('de');
 select tests.fails(format('select record_room_validation(%s, %s, ''correct'')', tests.r('900001003001'), tests.seen_r('900001003001')),
                    '23514', 'nothing more is recorded for a signed-off SDO');

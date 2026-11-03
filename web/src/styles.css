@@ -373,3 +373,6 @@ table.watsan th:first-child { text-align: left; }
 table.watsan td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.watsan td:first-child { min-width: 190px; }
 table.watsan tr.total td { border-top: 2px solid var(--line); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+fieldset.f { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+fieldset.f legend { font-weight: 600; margin-bottom: 4px; }

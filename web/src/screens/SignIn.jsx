@@ -10,6 +10,7 @@ const SAMPLE_ACCOUNTS = [
   ['04', 'Division Planning Officer, Cebu City'],
   ['05', 'Regional Office (PPRD)'],
   ['08', 'Central Office (view only)'],
+  ['09', 'ESSD Engineer, Region (clears Divisions)'],
   ['07', 'School account (sample school)'],
 ];
 

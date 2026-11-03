@@ -4,7 +4,7 @@ import { CYCLE } from '../lib/labels.js';
 import { isLocal } from '../lib/supabase.js';
 
 // The NSBI School Building Inventory Form (CO memo of 24 July 2026), pre-filled from the validated record.
-// It opens only when the school is Complete and its SDO is signed off, so no unvalidated form is printed.
+// It opens only when the school is Complete and its Division is cleared by the Region, so no unvalidated form is printed.
 // Columns RIVET does not keep (floor number) stay blank for the school to write in.
 
 const AS_OF = 'May 31, 2026';
@@ -76,7 +76,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
     return (
       <main className="page">
         <h1>NSBI form · {d.tally.school_name}</h1>
-        <div className="notice warn">Available once the school is marked Complete by the DPO and its SDO is signed off by the RO,
+        <div className="notice warn">Available once the school is marked Complete by the DPO and its Division is cleared by the Region,
           so that only a validated record is printed.</div>
       </main>
     );
@@ -123,7 +123,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
     <main className="nf">
       <div className="nf-bar noprint">
         <a href={`#/school/${schoolId}`} className="small">← School page</a>
-        {!open && <span className="chip amber">Local preview: the school or its SDO is not yet signed off</span>}
+        {!open && <span className="chip amber">Local preview: the school is not yet Complete or its Division not yet cleared</span>}
         <button type="button" className="btn" onClick={() => window.print()}>Print or save as PDF</button>
       </div>
 

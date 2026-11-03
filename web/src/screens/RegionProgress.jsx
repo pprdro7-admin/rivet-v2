@@ -3,29 +3,44 @@ import { Bar, ErrorNote, Loading, go } from '../components/ui.jsx';
 import { CYCLE, n, pct, problem } from '../lib/labels.js';
 import { CoNotes } from '../components/Returns.jsx';
 
-// Regional Office home: where each SDO stands, sign-off, and freezing the cycle.
+// Regional home: where each Division stands, clearing a Division, and freezing the cycle.
+// The ESSD Engineers clear a Division ("Cleared by the Region"); PPRD may undo it with a reason
+// (Ada, 2026-11-03).
 export default function RegionProgress({ db, me }) {
   const [rows, setRows] = useState(null);
   const [cycle, setCycle] = useState(null);
   const [error, setError] = useState(null);
   const [note, setNote] = useState(null);
+  const [hist, setHist] = useState({});
+  const isEssd = me.role === 'co' && /^ESSD/i.test(me.office || '');
 
   const load = useCallback(async () => {
-    const [p, c] = await Promise.all([
+    const [p, c, h] = await Promise.all([
       db.from('sdo_progress').select('*').eq('cycle_id', CYCLE).order('sdo_name'),
       db.from('cycles').select('*').eq('id', CYCLE).single(),
+      db.from('sdo_clearance_history').select('*').eq('cycle_id', CYCLE).order('cleared_at', { ascending: false }),
     ]);
-    if (p.error || c.error) { setError(p.error || c.error); return; }
+    if (p.error || c.error || h.error) { setError(p.error || c.error || h.error); return; }
+    const byS = {};
+    h.data.forEach((x) => { (byS[x.sdo_code] ||= []).push(x); });
+    setHist(byS);
     setRows(p.data);
     setCycle(c.data);
   }, [db]);
   useEffect(() => { load(); }, [load]);
 
   async function signOff(sdo) {
-    const remarks = window.prompt(`Sign off ${sdo.sdo_name}? Nothing more can be recorded for this SDO.\n\nRemarks (e.g. certification received):`);
+    const remarks = window.prompt(`Clear ${sdo.sdo_name}? Its schools can then print their pre-filled forms, and nothing more can be recorded for this Division unless PPRD undoes the clearance.\n\nRemarks (optional):`);
     if (remarks === null) return;
     const { error: e } = await db.rpc('sign_off_sdo', { p_cycle: CYCLE, p_sdo: sdo.sdo_code, p_remarks: remarks });
-    setNote(e ? { err: problem(e) } : { ok: `${sdo.sdo_name} signed off.` });
+    setNote(e ? { err: problem(e) } : { ok: `${sdo.sdo_name} is cleared by the Region.` });
+    load();
+  }
+  async function undo(sdo) {
+    const reason = window.prompt(`Undo the clearance of ${sdo.sdo_name}? Its schools can be updated again, and the pre-filled forms close until it is cleared again.\n\nReason (kept on record):`);
+    if (reason === null) return;
+    const { error: e } = await db.rpc('undo_sdo_clearance', { p_cycle: CYCLE, p_sdo: sdo.sdo_code, p_reason: reason });
+    setNote(e ? { err: problem(e) } : { ok: `The clearance of ${sdo.sdo_name} is undone.` });
     load();
   }
 
@@ -55,14 +70,14 @@ export default function RegionProgress({ db, me }) {
       <div className="today-top">
         <div className="tile"><strong>{pct(t.records ? t.withStatus / t.records : 0)}</strong><span className="muted">of {n(t.records)} buildings and rooms have a status from the Engineers</span></div>
         <div className="tile"><strong>{n(t.done)}</strong><span className="muted">of {n(t.schools)} schools marked Complete by the DPO</span></div>
-        <div className="tile"><strong>{t.signed}</strong><span className="muted">of {rows.length} SDOs signed off</span></div>
+        <div className="tile"><strong>{t.signed}</strong><span className="muted">of {rows.length} Divisions cleared by the Region</span></div>
       </div>
       <div className="card">
         <div className="scroll">
           <table className="cards">
             <thead><tr>
               <th>SDO</th><th className="num">Schools</th><th className="num">Buildings</th><th className="num">Rooms</th>
-              <th className="num">Flagged rooms</th><th>With a status</th><th className="num">Schools complete</th><th className="num">Returned</th><th>Sign-off</th>
+              <th className="num">Flagged rooms</th><th>With a status</th><th className="num">Schools complete</th><th className="num">Returned</th><th>Cleared by the Region</th>
             </tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -76,9 +91,22 @@ export default function RegionProgress({ db, me }) {
                   <td className="num" data-label="Schools complete" onClick={(e) => e.stopPropagation()}>
                     <a href={`#/sdo/${r.sdo_code}?show=complete`} title="List the complete schools">{n(r.schools_complete)} of {n(r.schools)}</a></td>
                   <td className="num" data-label="Returned">{n(r.schools_returned)}</td>
-                  <td data-label="Sign-off" onClick={(e) => e.stopPropagation()}>
-                    {r.signed_at ? <span className="chip green">Signed off</span>
-                      : me.role === 'ro' && <button type="button" className="btn sm secondary" disabled={Number(r.schools_complete) < Number(r.schools)} onClick={() => signOff(r)}>Sign off</button>}
+                  <td data-label="Cleared by the Region" onClick={(e) => e.stopPropagation()}>
+                    {r.signed_at ? (
+                      <div className="stack" style={{ gap: 4 }}>
+                        <span className="chip green">Cleared {new Date(r.signed_at).toLocaleDateString('en-PH')}</span>
+                        {hist[r.sdo_code]?.[0]?.cleared_by && <span className="small muted">by {hist[r.sdo_code][0].cleared_by}</span>}
+                        {me.role === 'ro' && !cycle?.frozen_at && <button type="button" className="btn sm danger" onClick={() => undo(r)}>Undo clearance</button>}
+                      </div>
+                    ) : (
+                      <div className="stack" style={{ gap: 4 }}>
+                        {isEssd ? <button type="button" className="btn sm secondary" disabled={Number(r.schools_complete) < Number(r.schools)}
+                          title={Number(r.schools_complete) < Number(r.schools) ? 'Every school must be marked Complete first' : undefined} onClick={() => signOff(r)}>Clear the Division</button>
+                          : <span className="small muted">Not yet</span>}
+                        {hist[r.sdo_code]?.find((x) => x.undone_at) && (() => { const u = hist[r.sdo_code].find((x) => x.undone_at);
+                          return <span className="small" style={{ color: 'var(--amber)' }}>Clearance undone {new Date(u.undone_at).toLocaleDateString('en-PH')}: {u.undo_reason}</span>; })()}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

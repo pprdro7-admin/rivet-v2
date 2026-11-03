@@ -9,7 +9,8 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000005', 'ro@sample.test'),
   ('00000000-0000-0000-0000-000000000006', 'admin@sample.test'),
   ('00000000-0000-0000-0000-000000000007', 'school.900001@sample.test'),
-  ('00000000-0000-0000-0000-000000000008', 'co@sample.test');
+  ('00000000-0000-0000-0000-000000000008', 'co@sample.test'),
+  ('00000000-0000-0000-0000-000000000009', 'essd@sample.test');
 
 insert into profiles (id, email, full_name, role, sdo_code) values
   ('00000000-0000-0000-0000-000000000001', 'de.bohol@sample.test',     'Sample DE, Bohol',      'de',    'BOH'),
@@ -19,6 +20,10 @@ insert into profiles (id, email, full_name, role, sdo_code) values
   ('00000000-0000-0000-0000-000000000005', 'ro@sample.test',           'Sample RO PPRD',        'ro',    null),
   ('00000000-0000-0000-0000-000000000006', 'admin@sample.test',        'Sample administrator',  'admin', null),
   ('00000000-0000-0000-0000-000000000008', 'co@sample.test',           'Sample Central Office', 'co',    null);
+
+-- An ESSD Engineer of the Region: views every record and clears a Division.
+insert into profiles (id, email, full_name, role, sdo_code, office) values
+  ('00000000-0000-0000-0000-000000000009', 'essd@sample.test', 'Sample ESSD Engineer', 'co', null, 'ESSD RO7');
 
 -- A school's own account: sees and updates only its School ID.
 insert into profiles (id, email, full_name, role, sdo_code, school_id) values
