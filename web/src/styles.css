@@ -297,6 +297,16 @@ svg.plan:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .sk-gridline { stroke: #e9edf2; }
 .sk-bound { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 10 6; }
 .sk-note { font-size: 12.5px; fill: var(--muted); }
+.sk-fence { stroke: #6b4f3a; stroke-width: 4; stroke-linecap: round; fill: none; }
+.sk-fence.open { stroke: #b8977c; stroke-width: 2.5; stroke-dasharray: 3 7; }
+.sk-fence-fill { fill: rgba(107, 79, 58, 0.04); stroke: none; }
+.sk-side-hit { stroke: transparent; stroke-width: 18; cursor: pointer; }
+.sk-corner { fill: #fff; stroke: #6b4f3a; stroke-width: 2.5; cursor: move; }
+.sk-corner.first { fill: #6b4f3a; }
+svg.plan.fence-editing { cursor: crosshair; }
+svg.plan.fence-editing .sk-item { pointer-events: none; opacity: 0.45; }
+.legend i.fence { background: none; width: 18px; border-radius: 0; border-top: 4px solid #6b4f3a; height: 0; align-self: center; }
+.legend i.fence.open { border-top: 3px dashed #b8977c; }
 .sk-item rect { stroke: #fff; stroke-width: 2; }
 .sk-item.movable { cursor: grab; }
 .sk-item.sel rect { stroke: var(--ink); stroke-width: 3; }

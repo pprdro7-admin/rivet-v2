@@ -23,15 +23,36 @@ function tone(c) {
   return 'bad';
 }
 const snap = (v) => Math.round(v / GRID) * GRID;
+const clampPt = ([x, y]) => [Math.max(0, Math.min(W, snap(x))), Math.max(0, Math.min(H, snap(y)))];
+const RECT = [[10, 10], [W - 10, 10], [W - 10, H - 10], [10, H - 10]];
+// Sides of a fence: side i runs from corner i to corner i + 1; the last closes the loop.
+const sidesOf = (pts, closed = true) => pts.map((p, i) => [p, pts[(i + 1) % pts.length], i]).slice(0, closed ? pts.length : Math.max(0, pts.length - 1));
+
+// The fence as drawn: solid where there is a fence, dashed where a side is open (no fence yet).
+function Fence({ pts, open }) {
+  return (
+    <g className="sk-fenceg">
+      <polygon points={pts.map((p) => p.join(',')).join(' ')} className="sk-fence-fill" data-bg="1" />
+      {sidesOf(pts).map(([a, b, i]) => (
+        <line key={i} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className={`sk-fence${open.includes(i) ? ' open' : ''}`} />
+      ))}
+    </g>
+  );
+}
 
 // The school head may make the first placing; the Engineer checks it on site and confirms it
 // (Ada, 2026-11-03). A school's change after the last confirmation shows as not yet confirmed.
 export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, isSchool, onOpen, onDone, onFail }) {
   const [state, setState] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [fences, setFences] = useState({});
+  const [fe, setFe] = useState(null); // fence being drawn: { pts, open, closed }
+  const fdrag = useRef(null);
   useEffect(() => {
     db.from('sketch_state').select('*').eq('cycle_id', CYCLE).eq('school_id', schoolId).maybeSingle()
       .then(({ data: st }) => setState(st ?? {}));
+    db.from('site_fence_latest').select('site_no, points, open_sides').eq('cycle_id', CYCLE).eq('school_id', schoolId)
+      .then(({ data: fs }) => setFences(Object.fromEntries((fs || []).map((f) => [f.site_no, f]))));
   }, [db, schoolId, data.sketch]);
   async function confirm() {
     setConfirming(true);
@@ -114,6 +135,39 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
     if (error) onFail(error); else { setSite(1); onDone(); }
   }
 
+  // The fence: the school (or the Engineer) traces the actual fence, corner by corner.
+  const fence = fences[site];
+  function startFence(from) {
+    setSel(null);
+    setFe(from === 'rect' ? { pts: RECT, open: [], closed: true }
+      : from === 'edit' ? { pts: fence.points, open: fence.open_sides || [], closed: true }
+        : { pts: [], open: [], closed: false });
+  }
+  async function saveFence(removed = false) {
+    if (!removed && (!fe.closed || fe.pts.length < 3)) return;
+    setBusy(true);
+    const { error } = await db.rpc('record_site_fence', { p_cycle: CYCLE, p_school: schoolId, p_site_no: site,
+      p_points: removed ? null : fe.pts, p_open_sides: removed ? [] : fe.open, p_removed: removed });
+    setBusy(false);
+    if (error) { onFail(error); return; }
+    setFe(null); onDone();
+  }
+  function fenceDown(e) {
+    if (!fe || fe.closed) return;
+    const p = clampPt([toSketch(e).x, toSketch(e).y]);
+    setFe((f) => ({ ...f, pts: [...f.pts, p] }));
+  }
+  function cornerDown(e, k) {
+    e.stopPropagation();
+    if (!fe.closed && k === 0 && fe.pts.length >= 3) { setFe({ ...fe, closed: true }); return; }
+    fdrag.current = k;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function toggleSide(e, i) {
+    e.stopPropagation();
+    setFe({ ...fe, open: fe.open.includes(i) ? fe.open.filter((x) => x !== i) : [...fe.open, i].sort((a, b) => a - b) });
+  }
+
   // Dragging: screen point to sketch units through the SVG's own transform.
   function toSketch(e) {
     const pt = svg.current.createSVGPoint();
@@ -128,6 +182,11 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function move(e) {
+    if (fdrag.current != null) {
+      const p = clampPt([toSketch(e).x, toSketch(e).y]);
+      setFe((f) => ({ ...f, pts: f.pts.map((q, k) => (k === fdrag.current ? p : q)) }));
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     const p = toSketch(e);
@@ -141,6 +200,7 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
     });
   }
   async function up() {
+    fdrag.current = null;
     const d = drag.current;
     drag.current = null;
     if (d?.moved) await put(latest.current[d.key]);
@@ -190,8 +250,10 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
               onClick={() => { setSite(s.site_no); setSel(null); }}>{s.site_no === 1 ? 'Main site' : `Adjacent site: ${s.name}`}</button>
           ))}
         </div>
-        {canEdit && (
+        {canEdit && !fe && (
           <div className="btns">
+            {fence ? <button type="button" className="btn sm secondary" onClick={() => startFence('edit')}>Edit the fence</button>
+              : <button type="button" className="btn sm secondary" onClick={() => startFence('trace')}>Draw the fence</button>}
             {unplaced.some((b) => b.cond !== 'Demolished') && <button type="button" className="btn sm secondary" disabled={busy} onClick={placeAll}>Place all unplaced buildings here</button>}
             <button type="button" className="btn sm secondary" onClick={addSite}>Add an adjacent site</button>
             {site !== 1 && <button type="button" className="btn sm secondary" onClick={removeSite}>Remove this site</button>}
@@ -201,13 +263,14 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
 
       <div className="sketch">
         <div>
-          <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className="plan" role="img" aria-label={`Site sketch, ${siteName}`}
+          <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className={`plan${fe ? ' fence-editing' : ''}`} role="img" aria-label={`Site sketch, ${siteName}`}
             tabIndex={canEdit ? 0 : -1} onKeyDown={nudge} onPointerMove={move} onPointerUp={up} onPointerLeave={up}
-            onPointerDown={(e) => { if (e.target === svg.current || e.target.dataset.bg) setSel(null); }}>
+            onPointerDown={(e) => { if (fe) { fenceDown(e); return; } if (e.target === svg.current || e.target.dataset.bg) setSel(null); }}>
             <defs><pattern id="sk-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0 L0 0 0 20" fill="none" className="sk-gridline" /></pattern></defs>
             <rect width={W} height={H} fill="url(#sk-grid)" data-bg="1" />
-            <rect x="8" y="8" width={W - 16} height={H - 16} className="sk-bound" data-bg="1" />
-            <text x="18" y="26" className="sk-note">{siteName} boundary</text>
+            {!fe && (fence ? <Fence pts={fence.points} open={fence.open_sides || []} />
+              : <rect x="8" y="8" width={W - 16} height={H - 16} className="sk-bound" data-bg="1" />)}
+            {!fe && <text x="18" y="26" className="sk-note">{fence ? `${siteName}: fence as drawn` : `${siteName} boundary (fence not drawn yet)`}</text>}
             {here.sort((a, b) => (a.kind === 'building') - (b.kind === 'building')).map((i) => {
               const b = i.kind === 'building' ? byNo[Number(i.item_key.slice(2))] : null;
               const cls = b ? `sk-b c-${tone(b.cond)}` : `sk-m k-${i.kind}`;
@@ -223,16 +286,51 @@ export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, is
                 </g>
               );
             })}
+            {fe && (
+              <g>
+                {fe.closed && <polygon points={fe.pts.map((p) => p.join(',')).join(' ')} className="sk-fence-fill" />}
+                {sidesOf(fe.pts, fe.closed).map(([a, b, i]) => (
+                  <g key={i}>
+                    <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className={`sk-fence${fe.open.includes(i) ? ' open' : ''}`} />
+                    {fe.closed && <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} className="sk-side-hit" onPointerDown={(e) => toggleSide(e, i)}>
+                      <title>{fe.open.includes(i) ? 'No fence on this side: click to mark it fenced' : 'Click to mark this side as having no fence yet'}</title></line>}
+                  </g>
+                ))}
+                {fe.pts.map((p, k) => (
+                  <circle key={k} cx={p[0]} cy={p[1]} r={k === 0 && !fe.closed && fe.pts.length >= 3 ? 9 : 7}
+                    className={`sk-corner${k === 0 ? ' first' : ''}`} onPointerDown={(e) => cornerDown(e, k)} />
+                ))}
+              </g>
+            )}
           </svg>
           <div className="legend small">
             <span><i className="c-good" />Good</span><span><i className="c-minor" />Minor repair</span><span><i className="c-major" />Major repair</span>
             <span><i className="c-bad" />Condemnation / construction</span><span><i className="c-gone" />Demolished</span>
+            <span><i className="fence" />Fence</span><span><i className="fence open" />No fence yet</span>
             <span><i className="k-watsan" />WATSAN</span><span><i className="k-court" />Covered court</span><span><i className="k-grounds" />Grounds</span>
           </div>
         </div>
 
         <aside className="sk-side">
-          {selItem ? (
+          {fe ? (
+            <div className="sk-sel">
+              <h3>{fence ? 'Edit the fence' : 'Draw the fence'}</h3>
+              <p className="small">{!fe.closed
+                ? (fe.pts.length < 3 ? 'Click on the sketch at each corner of the fence, going around in order.'
+                  : 'Keep clicking the corners. Click the first corner (the dark dot) to close the fence.')
+                : 'Drag a corner to match the actual fence. Click a side to mark it as having no fence yet (dashed); click it again to mark it fenced.'}</p>
+              <div className="btns">
+                {!fe.closed && fe.pts.length > 0 && <button type="button" className="btn sm secondary" onClick={() => setFe({ ...fe, pts: fe.pts.slice(0, -1) })}>Undo last corner</button>}
+                {!fe.closed && fe.pts.length === 0 && <button type="button" className="btn sm secondary" onClick={() => startFence('rect')}>Start from a rectangle</button>}
+                {fe.closed && <button type="button" className="btn sm secondary" onClick={() => startFence('trace')}>Start over</button>}
+              </div>
+              <div className="btns">
+                <button type="button" className="btn sm" disabled={busy || !fe.closed} onClick={() => saveFence(false)}>{isSchool ? 'Save and send to the Engineer' : 'Save the fence'}</button>
+                <button type="button" className="btn sm secondary" onClick={() => setFe(null)}>Cancel</button>
+                {fence && <button type="button" className="btn sm danger" disabled={busy} onClick={() => saveFence(true)}>Remove the fence</button>}
+              </div>
+            </div>
+          ) : selItem ? (
             <SelPanel item={selItem} b={selItem.kind === 'building' ? byNo[Number(selItem.item_key.slice(2))] : null} sites={sites}
               canEdit={canEdit} onOpen={onOpen} onResize={resize}
               onMove={(s) => { put(selItem, { site_no: s }); setSel(null); }}

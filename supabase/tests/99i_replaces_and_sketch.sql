@@ -54,6 +54,19 @@ select tests.ok(not (select waits_for_engineer from sketch_state where school_id
 select tests.login('school');
 select record_sketch_item('SY2025-2026', '900001', 'm:2', 'gate', 'Gate', 1, 80, 40, 60, 30);
 select tests.ok((select waits_for_engineer from sketch_state where school_id = '900001'), 'a school change after confirmation waits again');
+select tests.login('de');
+select confirm_sketch('SY2025-2026', '900001');
+select tests.login('school');
+select tests.fails('select record_site_fence(''SY2025-2026'', ''900001'', 1, ''[[10,10],[700,10]]'')', '23514', 'a fence needs at least 3 corners');
+select tests.fails('select record_site_fence(''SY2025-2026'', ''900001'', 1, ''[[10,10],[900,10],[10,400]]'')', '23514', 'fence corners stay on the drawing');
+select tests.fails('select record_site_fence(''SY2025-2026'', ''900001'', 1, ''[[10,10],[700,10],[10,400]]'', ''{5}'')', '23514', 'an open side is one of the fence''s sides');
+select tests.fails('select record_site_fence(''SY2025-2026'', ''900001'', 7, ''[[10,10],[700,10],[10,400]]'')', '23514', 'a fence goes on an existing site');
+select record_site_fence('SY2025-2026', '900001', 1, '[[20,20],[760,20],[760,300],[400,300],[400,440],[20,440]]', '{3}');
+select tests.ok((select jsonb_array_length(points) = 6 and open_sides = '{3}' and by_school from site_fence_latest where school_id = '900001' and site_no = 1),
+                'the school traces the actual fence, any shape, with a side marked open');
+select tests.ok((select waits_for_engineer from sketch_state where school_id = '900001'), 'a school''s fence waits for the Engineer');
+select record_site_fence('SY2025-2026', '900001', 1, null, '{}', true);
+select tests.ok(not exists (select 1 from site_fence_latest where school_id = '900001'), 'a fence can be cleared back to the plain boundary');
 select tests.fails('select record_building_replaces(''SY2025-2026'', ''900001'', 4, null)', '42501',
                    'a school account does not mark replacements');
 
