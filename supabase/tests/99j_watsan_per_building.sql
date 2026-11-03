@@ -27,6 +27,11 @@ select record_building_watsan('SY2025-2026', '900001', 2,
 select tests.ok((select validated is null and flag is null from building_watsan_status where school_id = '900001' and building_no = 2),
                 'a removed row is no longer counted or flagged');
 select tests.ok((select count(*) from building_watsan_entries where school_id = '900001' and building_no = 2) = 2, 'every step stays on record');
+select record_building_watsan('SY2025-2026', '900001', 2,
+  (select last_step_id from building_watsan_status where school_id = '900001' and building_no = 2),
+  '{"toilet_male":0,"toilet_female":0,"toilet_pwd":0,"toilet_shared":0,"nonfunc_toilet":0,"sink":0,"urinal":0,"urinal_trough":0,"septic_tank":0,"faucet_with_water":0,"faucet_without_water":0}');
+select tests.ok((select validated is not null and flag is null from building_watsan_status where school_id = '900001' and building_no = 2),
+                'No WATSAN (all 0) in a building For Condemnation is answered and not flagged');
 select tests.fails('select record_building_watsan(''SY2025-2026'', ''900003'', 1, null, ''{"toilet_male": 1}'')', '42501',
                    'a DE cannot enter another SDO''s school');
 

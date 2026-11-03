@@ -474,7 +474,7 @@ function DpoCheck({ db, schoolId, openItems, canAct, onDone, onFail }) {
   return (
     <section className="card">
       <h2>Completion check (DPO)</h2>
-      <p className="muted small">This checks that the record is complete: every building and room has a status from the Engineer. The technical validation is the Engineer's.</p>
+      <p className="muted small">This checks that the record is complete: every building and room has a status from the Engineer, and every building is answered in Table 4A. The technical validation is the Engineer's.</p>
       {pending.length === 0
         ? <div className="notice ok">Every building and room has a status, and no room is left in a building for deletion.</div>
         : <div className="notice warn">{pending.map((o) => <span key={o.item}>{o.item}: {o.n}</span>)}</div>}

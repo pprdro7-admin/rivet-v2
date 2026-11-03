@@ -30,6 +30,36 @@ language sql stable security definer set search_path = public as $$
                         and w.building_no = b.building_no and w.validated is not null)
 $$;
 
+-- A building answered "No WATSAN" (all 0) is not flagged for its condition: nothing is in use there.
+create or replace view building_watsan_status with (security_invoker = true) as
+with k as (
+  select cycle_id, school_id, building_no, max(id) as last_step_id from building_watsan_entries group by 1, 2, 3
+), v as (
+  select distinct on (cycle_id, school_id, building_no) * from building_watsan_entries
+  where not by_school order by cycle_id, school_id, building_no, id desc
+), w as (
+  select distinct on (cycle_id, school_id, building_no) * from building_watsan_entries
+  order by cycle_id, school_id, building_no, id desc
+)
+select k.cycle_id, k.school_id, w.sdo_code, k.building_no, k.last_step_id,
+       case when not coalesce(v.removed, true) then v.measures end as validated,
+       v.remarks as validated_remarks, v.recorded_at as validated_at,
+       case when w.by_school then w.measures end as school_update,
+       case when w.by_school then w.removed end as school_update_removes,
+       case when w.by_school then w.remarks end as school_update_remarks,
+       building_condition_now(k.cycle_id, k.school_id, k.building_no) as building_condition,
+       case
+         when building_for_deletion_now(k.cycle_id, k.school_id, k.building_no) and not coalesce(v.removed, true)
+           then 'The building is set for deletion: remove its WATSAN row or move it to the right building'
+         when building_condition_now(k.cycle_id, k.school_id, k.building_no)
+                in ('For Condemnation', 'Condemned / For Demolition', 'Demolished') and not coalesce(v.removed, true)
+              and exists (select 1 from jsonb_each(v.measures) where (value #>> '{}')::numeric > 0)
+           then format('The building is %s: check that this WATSAN is still in use', building_condition_now(k.cycle_id, k.school_id, k.building_no))
+       end as flag
+from k
+left join v using (cycle_id, school_id, building_no)
+join w using (cycle_id, school_id, building_no);
+
 -- 2. The school's first placing of the sketch, confirmed by the Engineer ----------------------------
 
 alter table sketch_items add column by_school boolean not null default made_by_school();
