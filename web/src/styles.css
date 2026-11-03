@@ -354,3 +354,10 @@ main.nf { max-width: 1240px; margin: 0 auto; padding: 16px; font-family: Cambria
   .nf-page { border: 0; padding: 0; margin: 0; page-break-after: always; }
 }
 .nf-t th { text-transform: none; letter-spacing: 0; color: #000; font-size: 9px; background: none; }
+table.watsan { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.watsan th { font-size: 11px; font-weight: 600; color: var(--muted); text-align: right; padding: 6px; border-bottom: 1px solid var(--line); vertical-align: bottom; }
+table.watsan th:first-child, table.watsan thead tr:first-child th[colspan] { text-align: center; }
+table.watsan th:first-child { text-align: left; }
+table.watsan td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.watsan td:first-child { min-width: 190px; }
+table.watsan tr.total td { border-top: 2px solid var(--line); }

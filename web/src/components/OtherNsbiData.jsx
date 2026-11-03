@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ErrorNote } from './ui.jsx';
 import { CYCLE, n, problem } from '../lib/labels.js';
+import WatsanByBuilding from './WatsanByBuilding.jsx';
 
 // The rest of the SY 2025-2026 template for one school. Tables 3 to 7 start blank and are filled in
 // by the SDO (a school's entry waits for the SDO), with the latest NSBI values CO released shown beside
@@ -40,9 +41,8 @@ const SECTIONS = [
       ['Classes/sections using them', 'makeshift_classes', ES_SS],
     ] },
   ] },
-  { table: 'T4', title: 'Table 4a/4b · Water and sanitation (DepEd managed)', groups: [
-    { name: 'Attached to a building', rows: watsanRows('attached') },
-    { name: 'Stand-alone', rows: watsanRows('standalone') },
+  { table: 'T4', title: 'Table 4B · Stand-alone water and sanitation facilities', groups: [
+    { rows: watsanRows('standalone') },
   ] },
   { table: 'T5', title: 'Table 5 · Usable furniture', groups: [
     { rows: [
@@ -217,8 +217,12 @@ export default function OtherNsbiData({ db, schoolId, canEdit, isSchool, isSDO, 
         reference only and is not copied in.
       </p>
       {shown.map((s) => (
+        <React.Fragment key={s.table}>
+        {s.table === 'T4' && <WatsanByBuilding db={db} schoolId={schoolId} canEdit={canEdit} isSchool={isSchool} isSDO={isSDO}
+          was={recs.T4?.measures} wasLabel={recs.T4?.cycle_label} onSaved={(m) => onSaved?.(m)} />}
         <Section key={s.table} s={s} refRec={recs[s.table]} st={status[s.table]} db={db} schoolId={schoolId}
           canEdit={canEdit} isSchool={isSchool} isSDO={isSDO} onSaved={(m) => { load(); onSaved?.(m); }} />
+        </React.Fragment>
       ))}
     </section>
   );

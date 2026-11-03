@@ -27,7 +27,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
       try {
         const [tally] = await q(db.from('school_tally').select('*').eq('cycle_id', CYCLE).eq('school_id', schoolId));
         if (!tally) throw new Error('This school is not in your SDO, or not in the NSBI 2025–2026 data.');
-        const [sdo, signed, bs, cob, nbs, rs, cor, nrs, tables] = await Promise.all([
+        const [sdo, signed, bs, cob, nbs, rs, cor, nrs, tables, wb] = await Promise.all([
           q(db.from('sdos').select('name').eq('code', tally.sdo_code)),
           q(db.from('sdo_signoffs').select('signed_at').eq('cycle_id', CYCLE).eq('sdo_code', tally.sdo_code)),
           q(db.from('building_status').select('*').eq('cycle_id', CYCLE).eq('school_id', schoolId)),
@@ -37,6 +37,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
           q(db.from('co_rooms').select('id, width_m, length_m').eq('cycle_id', CYCLE).eq('school_id', schoolId)),
           q(db.from('live_new_rooms').select('*').eq('cycle_id', CYCLE).eq('school_id', schoolId)),
           q(db.from('school_table_status').select('co_table, validated').eq('cycle_id', CYCLE).eq('school_id', schoolId)),
+          q(db.from('building_watsan_status').select('building_no, validated').eq('cycle_id', CYCLE).eq('school_id', schoolId)),
         ]);
         const co = Object.fromEntries(cob.map((b) => [b.id, b.co_record]));
         const dims = Object.fromEntries(cor.map((r) => [r.id, r]));
@@ -61,7 +62,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
         ].sort((a, b) => (a.bno ?? 999) - (b.bno ?? 999) || (a.no ?? 999) - (b.no ?? 999));
         const t = Object.fromEntries(tables.map((x) => [x.co_table, x.validated]));
         const first = buildings.find((b) => b.lon != null) ?? {};
-        setD({ tally, sdoName: sdo[0]?.name ?? tally.sdo_code, signed: signed.length > 0, buildings, rooms, t,
+        setD({ watsan: wb.filter((w) => w.validated).sort((a, b) => a.building_no - b.building_no), tally, sdoName: sdo[0]?.name ?? tally.sdo_code, signed: signed.length > 0, buildings, rooms, t,
           lon: first.lon ?? '', lat: first.lat ?? '' });
       } catch (e) { setError(e); }
     })();
@@ -187,10 +188,15 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
           <tr><th>Male</th><th>Female</th><th>PWD</th><th>Shared</th><th>With Water Supply</th><th>Without Water Supply</th></tr>
           <tr className="col">{Array.from({ length: 12 }, (_, i) => <td key={i}>Col. {i + 1}</td>)}</tr>
         </thead><tbody>
-          <tr><td className="c" style={{ fontSize: 8.5 }}>All buildings*</td>{w4('attached').map((v, i) => <td key={i} className="c">{v}</td>)}</tr>
-          {[1, 2, 3].map((i) => <tr key={i} className="blank">{Array.from({ length: 12 }, (_, j) => <td key={j} />)}</tr>)}
+          {pad(d.watsan, 4).map((w, i) => (w ? (
+            <tr key={i}><td className="c">{w.building_no}</td>
+              {['toilet_male', 'toilet_female', 'toilet_pwd', 'toilet_shared', 'nonfunc_toilet', 'sink', 'urinal', 'urinal_trough', 'septic_tank',
+                'faucet_with_water', 'faucet_without_water'].map((k) => {
+                const v = w.validated[k];
+                return <td key={k} className="c">{v == null ? '' : k === 'septic_tank' ? (Number(v) === 1 ? 'Yes' : 'No') : v}</td>;
+              })}</tr>
+          ) : <tr key={i} className="blank">{Array.from({ length: 12 }, (_, j) => <td key={j} />)}</tr>))}
         </tbody></table>
-        <p className="nf-note">* RIVET keeps Table 4A as school totals for now; per-building rows come with the WATSAN-per-building update.</p>
         {sign(false)}{mark}
       </section>
 
