@@ -6,6 +6,8 @@ import { CYCLE, n, problem } from '../lib/labels.js';
 // that building's row, the Building Number being the one in Table 1, so the school's total is always
 // the sum of its buildings and cannot be over or under declared. A building set for deletion carries
 // none; one condemned or demolished is flagged. Rules live in record_building_watsan.
+// Every other building is answered, with its counts or "No WATSAN" (all 0), so that a blank never
+// passes for none; an unanswered building keeps the school from being marked Complete.
 
 export const WATSAN_COLS = [
   ['toilet_male', 'Male'], ['toilet_female', 'Female'], ['toilet_pwd', 'PWD'], ['toilet_shared', 'Shared'],
@@ -14,6 +16,8 @@ export const WATSAN_COLS = [
   ['faucet_without_water', 'Without water'],
 ];
 const YESNO = 'septic_tank';
+const ZEROS = Object.fromEntries(WATSAN_COLS.map(([k]) => [k, 0]));
+const allZero = (m) => !!m && WATSAN_COLS.every(([k]) => m[k] != null && Number(m[k]) === 0);
 const show = (v, k) => (v === null || v === undefined ? <span className="muted">—</span>
   : k === YESNO ? (Number(v) === 1 ? 'Yes' : 'No') : n(v));
 
@@ -57,25 +61,31 @@ export default function WatsanByBuilding({ db, schoolId, canEdit, isSchool, isSD
     setEdit({ no: r.no, remarks: '', form: Object.fromEntries(WATSAN_COLS.map(([k]) => [k, src[k] == null ? '' : String(src[k])])) });
     setErr(null);
   }
-  async function save(removed = false) {
+  async function save(how = 'counts', no = edit?.no, remarks = edit?.remarks) {
     setBusy(true);
-    const r = rows.find((x) => x.no === edit.no);
-    const measures = removed ? null : Object.fromEntries(Object.entries(edit.form).map(([k, v]) => [k, v === '' ? null : Number(v)]));
-    const { error: e } = await db.rpc('record_building_watsan', { p_cycle: CYCLE, p_school: schoolId, p_building_no: edit.no,
-      p_seen: r.w?.last_step_id ?? null, p_measures: measures, p_removed: removed, p_remarks: edit.remarks || null });
+    const r = rows.find((x) => x.no === no);
+    const measures = how === 'clear' ? null : how === 'none' ? ZEROS
+      : Object.fromEntries(Object.entries(edit.form).map(([k, v]) => [k, v === '' ? null : Number(v)]));
+    const { error: e } = await db.rpc('record_building_watsan', { p_cycle: CYCLE, p_school: schoolId, p_building_no: no,
+      p_seen: r.w?.last_step_id ?? null, p_measures: measures, p_removed: how === 'clear', p_remarks: remarks || null });
     setBusy(false);
-    if (e) { setErr(problem(e)); return; }
+    if (e) { if (edit) setErr(problem(e)); else setError(e); return; }
     setEdit(null); load();
-    onSaved?.(isSchool ? 'Update sent to the Division Engineer.' : `Building ${edit.no} WATSAN saved.`);
+    onSaved?.(isSchool ? 'Update sent to the Division Engineer.'
+      : how === 'none' ? `Building ${no}: No WATSAN (all 0).` : `Building ${no} WATSAN saved.`);
   }
+  const asked = rows.filter((r) => !r.gone);
+  const answered = asked.filter((r) => r.w?.validated).length;
 
   return (
     <details className="card other" open={!!edit || undefined}>
       <summary><h3>Table 4A · Water and sanitation attached to a building</h3>
-        {anyEntered ? <span className="chip green">Filled in</span> : <span className="chip gray">Blank</span>}</summary>
+        {answered === asked.length ? <span className="chip green">All {asked.length} buildings answered</span>
+          : <span className="chip amber">{asked.length - answered} of {asked.length} buildings not yet reported</span>}</summary>
       <p className="small muted" style={{ margin: 0 }}>
-        One row per building, by its Building Number in Table 1. The school's total is the sum of its buildings.
-        A building set for deletion carries no WATSAN.
+        One row per building, by its Building Number in Table 1. Answer every building: give its counts, or
+        mark <b>No WATSAN</b> and it is reported as 0 in every column. The school cannot be marked Complete while
+        a building is not yet reported. A building set for deletion carries no WATSAN.
       </p>
       <div className="scroll">
         <table className="watsan">
@@ -93,7 +103,9 @@ export default function WatsanByBuilding({ db, schoolId, canEdit, isSchool, isSD
                 <React.Fragment key={r.no}>
                   <tr className={r.gone ? 'muted' : ''}>
                     <td><b>Building {r.no}</b><div className="small muted">{r.type}{r.isNew ? ' · not in the NSBI' : ''}</div>
-                      <div className="small">{r.gone ? 'For deletion' : r.condition}</div></td>
+                      <div className="small">{r.gone ? 'For deletion' : r.condition}</div>
+                      {!r.gone && !v && <span className="chip amber">Not yet reported</span>}
+                      {allZero(v) && <span className="chip gray">No WATSAN</span>}</td>
                     {WATSAN_COLS.map(([k, l]) => (
                       <td key={k} className="num">
                         {editing ? (k === YESNO
@@ -106,7 +118,12 @@ export default function WatsanByBuilding({ db, schoolId, canEdit, isSchool, isSD
                       </td>
                     ))}
                     <td>{canEdit && !editing && !r.gone && (
-                      <button type="button" className="btn sm secondary" onClick={() => start(r)}>{v ? 'Update' : 'Fill in'}</button>)}</td>
+                      <div className="btns" style={{ flexWrap: 'nowrap' }}>
+                        <button type="button" className="btn sm secondary" onClick={() => start(r)}>{v ? 'Update' : 'Fill in'}</button>
+                        {!v && !isSchool && <button type="button" className="btn sm secondary" disabled={busy} onClick={() => save('none', r.no, '')}>No WATSAN</button>}
+                      </div>)}
+                      {canEdit && !editing && r.gone && v && !isSchool && (
+                        <button type="button" className="btn sm danger" disabled={busy} onClick={() => save('clear', r.no, '')}>Clear the row</button>)}</td>
                   </tr>
                   {r.w?.flag && <tr><td colSpan={WATSAN_COLS.length + 2}><div className="flags">{r.w.flag}</div></td></tr>}
                   {r.w?.school_update && !editing && (
@@ -122,8 +139,8 @@ export default function WatsanByBuilding({ db, schoolId, canEdit, isSchool, isSD
                         <label className="f">Remarks (optional)<textarea rows={2} value={edit.remarks} onChange={(e) => setEdit({ ...edit, remarks: e.target.value })} /></label>
                         {err && <ErrorNote error={err} />}
                         <div className="btns">
-                          <button type="button" className="btn sm" disabled={busy} onClick={() => save(false)}>{busy ? 'Saving…' : isSchool ? 'Send to the SDO' : 'Save'}</button>
-                          {v && <button type="button" className="btn sm danger" disabled={busy} onClick={() => save(true)}>This building has no WATSAN</button>}
+                          <button type="button" className="btn sm" disabled={busy} onClick={() => save('counts')}>{busy ? 'Saving…' : isSchool ? 'Send to the SDO' : 'Save'}</button>
+                          <button type="button" className="btn sm secondary" disabled={busy} onClick={() => save('none')}>No WATSAN in this building (all 0)</button>
                           <button type="button" className="btn sm secondary" onClick={() => setEdit(null)}>Cancel</button>
                         </div>
                       </div>

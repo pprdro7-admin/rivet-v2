@@ -40,8 +40,20 @@ select tests.fails('select record_sketch_item(''SY2025-2026'', ''900003'', ''m:1
 
 select tests.login('school');
 select tests.ok((select count(*) from sketch_latest where school_id = '900001') = 3, 'the school sees its sketch');
-select tests.fails('select record_sketch_item(''SY2025-2026'', ''900001'', ''m:2'', ''gate'', ''Gate'', 1, 40, 40, 60, 30)', '42501',
-                   'a school account does not draw the sketch');
+select tests.ok(not (select waits_for_engineer from sketch_state where school_id = '900001'), 'a sketch drawn by the DE waits for no one');
+select record_sketch_item('SY2025-2026', '900001', 'm:2', 'gate', 'Gate', 1, 40, 40, 60, 30);
+select tests.ok((select by_school from sketch_items where school_id = '900001' and item_key = 'm:2' order by id desc limit 1),
+                'the school may place items on its own sketch');
+select tests.ok((select waits_for_engineer from sketch_state where school_id = '900001'), 'the school''s placing waits for the Engineer');
+select tests.fails('select confirm_sketch(''SY2025-2026'', ''900001'')', '42501', 'a school account does not confirm the sketch');
+select tests.login('de');
+select tests.fails('select confirm_sketch(''SY2025-2026'', ''900002'')', '23514', 'an empty sketch cannot be confirmed');
+select confirm_sketch('SY2025-2026', '900001');
+select tests.ok(not (select waits_for_engineer from sketch_state where school_id = '900001')
+                and (select confirmed_at is not null from sketch_state where school_id = '900001'), 'the Engineer confirms the sketch');
+select tests.login('school');
+select record_sketch_item('SY2025-2026', '900001', 'm:2', 'gate', 'Gate', 1, 80, 40, 60, 30);
+select tests.ok((select waits_for_engineer from sketch_state where school_id = '900001'), 'a school change after confirmation waits again');
 select tests.fails('select record_building_replaces(''SY2025-2026'', ''900001'', 4, null)', '42501',
                    'a school account does not mark replacements');
 

@@ -24,7 +24,22 @@ function tone(c) {
 }
 const snap = (v) => Math.round(v / GRID) * GRID;
 
-export default function SiteSketch({ db, schoolId, data, canEdit, onOpen, onDone, onFail }) {
+// The school head may make the first placing; the Engineer checks it on site and confirms it
+// (Ada, 2026-11-03). A school's change after the last confirmation shows as not yet confirmed.
+export default function SiteSketch({ db, schoolId, data, canEdit, canConfirm, isSchool, onOpen, onDone, onFail }) {
+  const [state, setState] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    db.from('sketch_state').select('*').eq('cycle_id', CYCLE).eq('school_id', schoolId).maybeSingle()
+      .then(({ data: st }) => setState(st ?? {}));
+  }, [db, schoolId, data.sketch]);
+  async function confirm() {
+    setConfirming(true);
+    const { error } = await db.rpc('confirm_sketch', { p_cycle: CYCLE, p_school: schoolId });
+    setConfirming(false);
+    if (error) { onFail(error); return; }
+    onDone();
+  }
   const buildings = [
     ...data.buildings.map((b) => ({ no: b.building_no, type: b.building_type, cond: b.final_condition, replaces: b.replaces_no })),
     ...data.newBuildings.map((b) => ({ no: b.building_no, type: b.building_type, cond: b.building_condition, replaces: b.replaces_no, isNew: true })),
@@ -148,6 +163,26 @@ export default function SiteSketch({ db, schoolId, data, canEdit, onOpen, onDone
   const siteName = sites.find((s) => s.site_no === site)?.name ?? 'Main site';
   return (
     <section className="card">
+      {state && (state.waits_for_engineer ? (
+        <div className="notice warn row">
+          <span>{isSchool ? 'Your placing is sent. The Division Engineer checks it on site and confirms it.'
+            : 'Placed or changed by the school, not yet confirmed by the Engineer.'}</span>
+          {canConfirm && <button type="button" className="btn sm" disabled={confirming} onClick={confirm}>{confirming ? 'Confirming…' : 'Confirm the sketch'}</button>}
+        </div>
+      ) : state.confirmed_at ? (
+        <div className="notice ok row">
+          <span>Confirmed by {state.confirmed_by || 'the Engineer'} on {new Date(state.confirmed_at).toLocaleDateString()}.</span>
+          {canConfirm && state.changed_at > state.confirmed_at && <button type="button" className="btn sm secondary" disabled={confirming} onClick={confirm}>Confirm again</button>}
+        </div>
+      ) : state.changed_at ? (
+        <div className="notice info row">
+          <span>Not yet confirmed by the Engineer.</span>
+          {canConfirm && <button type="button" className="btn sm" disabled={confirming} onClick={confirm}>Confirm the sketch</button>}
+        </div>
+      ) : (
+        <div className="notice info">{isSchool ? 'Nothing is placed yet. Place your buildings where they stand; the Division Engineer confirms the sketch after checking on site.'
+          : 'Nothing is placed yet. The school head may make the first placing, or you can.'}</div>
+      ))}
       <div className="spread">
         <div className="seg" role="group" aria-label="Site">
           {sites.map((s) => (

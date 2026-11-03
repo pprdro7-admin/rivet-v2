@@ -62,7 +62,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
         ].sort((a, b) => (a.bno ?? 999) - (b.bno ?? 999) || (a.no ?? 999) - (b.no ?? 999));
         const t = Object.fromEntries(tables.map((x) => [x.co_table, x.validated]));
         const first = buildings.find((b) => b.lon != null) ?? {};
-        setD({ watsan: wb.filter((w) => w.validated).sort((a, b) => a.building_no - b.building_no), tally, sdoName: sdo[0]?.name ?? tally.sdo_code, signed: signed.length > 0, buildings, rooms, t,
+        setD({ watsan: buildings.map((b) => ({ building_no: b.no, validated: wb.find((w) => w.building_no === b.no)?.validated ?? {} })), tally, sdoName: sdo[0]?.name ?? tally.sdo_code, signed: signed.length > 0, buildings, rooms, t,
           lon: first.lon ?? '', lat: first.lat ?? '' });
       } catch (e) { setError(e); }
     })();

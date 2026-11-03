@@ -223,7 +223,7 @@ export default function School({ db, me, schoolId }) {
       </>}
 
       {tab === 'sketch' && (
-        <SiteSketch db={db} schoolId={schoolId} data={data} canEdit={isSDO} onOpen={showBuilding}
+        <SiteSketch db={db} schoolId={schoolId} data={data} canEdit={canEdit} canConfirm={isSDO && canEdit} isSchool={isSchool} onOpen={showBuilding}
           onDone={() => load()} onFail={fail} />
       )}
 

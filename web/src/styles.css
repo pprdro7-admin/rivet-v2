@@ -85,6 +85,8 @@ tr.click:hover td { background: #f7f9fc; }
 .notice.warn { background: var(--amber-soft); border: 1px solid #f0d3a2; }
 .notice.err { background: var(--red-soft); border: 1px solid #e3b1aa; color: var(--red); }
 .notice.info { background: var(--blue-soft); border: 1px solid #c5d6f0; }
+.notice.row { flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+section.card > .notice:first-child { margin-bottom: 12px; }
 
 .timeline { display: flex; flex-direction: column; }
 .ev { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line-2); }

@@ -37,6 +37,17 @@ select tests.login('de');
 select record_room_validation(tests.r('900001002001'), null, 'for_deletion', p_reason => 'not_standard');
 
 select tests.login('dpo');
+select tests.fails('select record_dpo_check(''SY2025-2026'', ''900001'', ''complete'')', '23514',
+                   'a building not yet answered in Table 4A stops the school from being complete');
+select tests.ok((select n from school_open_items('SY2025-2026', '900001') where item like '%Table 4A%') = 3,
+                'the building for deletion is not asked for WATSAN');
+select tests.login('de');
+select record_building_watsan('SY2025-2026', '900001', b, null,
+  '{"toilet_male":0,"toilet_female":0,"toilet_pwd":0,"toilet_shared":0,"nonfunc_toilet":0,"sink":0,"urinal":0,"urinal_trough":0,"septic_tank":0,"faucet_with_water":0,"faucet_without_water":0}')
+from (select building_no as b from building_status where school_id = '900001' and status <> 'for_deletion'
+      union select building_no from live_new_buildings where school_id = '900001') x;
+
+select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900001', 'complete');
 select tests.ok((select dpo_complete and share_validated = 1 from school_tally where school_id = '900001'), 'the school is complete at 100% validated');
 select tests.ok((select buildings_after = 3 and rooms_after = 4 and rooms_for_deletion = 2 and instructional_rooms_after = 2
@@ -56,6 +67,7 @@ select tests.login('de');
 select record_building_validation(tests.b('900002001'), null, 'correct');
 select record_building_validation(tests.b('900002002'), null, 'for_deletion', p_reason => 'mistaken');
 select record_room_validation(tests.r('900002001001'), null, 'corrected', p_usage => 'Non-Instructional', p_remarks => 'No learners');
+select record_building_watsan('SY2025-2026', '900002', 1, null, '{"toilet_male":1,"toilet_female":1}');
 select tests.login('dpo');
 select record_dpo_check('SY2025-2026', '900002', 'complete');
 select tests.fails('select sign_off_sdo(''SY2025-2026'', ''BOH'')', '42501', 'only the RO signs off an SDO');
