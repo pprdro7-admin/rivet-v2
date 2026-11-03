@@ -177,7 +177,43 @@ export default function School({ db, me, schoolId }) {
           </div>
         );
   };
-  // From the sketch, a building's details open folded under the sketch, one at a time (Ada, 2026-11-03).
+  // From the sketch, a building's info opens folded under the sketch, one at a time, to read only:
+  // validating is done in the Table 1 list (Ada, 2026-11-03).
+  const bInfo = (x, isNew) => {
+    const rooms = isNew ? [] : data.rooms.filter((r) => r.building_id === x.building_id);
+    const newRooms = data.newRooms.filter((r) => (isNew ? r.new_building_id === x.id : r.building_id === x.building_id));
+    const cond = isNew ? x.building_condition : x.final_condition;
+    return (
+      <div className="bldg-detail">
+        <div className="facts">
+          <span>{x.building_type || 'Type not given'}</span>
+          <span>Condition: <b>{cond ?? 'blank'}</b>{!isNew && cond !== x.building_condition && <span className="co"> (NSBI: {x.building_condition ?? 'blank'})</span>}</span>
+          {isNew ? <span>{x.by_school ? 'Added by the school' : 'Not in the NSBI'}</span> : <span>Status: <StatusChip status={x.status} /></span>}
+          {x.replaces_no != null && <span>Replaces Bldg {x.replaces_no}</span>}
+          {isNew && x.storeys && <span>{x.storeys} storey(s)</span>}{isNew && x.year_completed && <span>Completed {x.year_completed}</span>}
+        </div>
+        {x.remarks && <div className="small"><b>Remarks:</b> {x.remarks}</div>}
+        <div className="scroll">
+          <table className="cards">
+            <thead><tr><th>Room</th><th>Condition</th><th>Usage</th><th>Actual usage</th><th>Status</th><th /></tr></thead>
+            <tbody>
+              {rooms.length + newRooms.length === 0 && <tr><td colSpan={6} className="muted">No rooms listed.</td></tr>}
+              {rooms.map((r) => (
+                <tr key={r.room_id}>
+                  <td>{r.room_no}</td>
+                  <td data-label="Condition">{r.final_condition ?? '—'}</td>
+                  <td data-label="Usage">{r.usage_locked ? '—' : r.final_usage ?? '—'}</td>
+                  <td data-label="Actual usage">{r.usage_locked ? <span className="small muted">Not in use</span> : (r.final_actual_usages || []).join(', ')}</td>
+                  <td data-label="Status"><StatusChip status={r.status} /></td><td />
+                </tr>
+              ))}
+              {newRooms.map((r) => <NewRoomRow key={`n${r.id}`} r={r} />)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
   const sketchRec = sketchB == null ? null : data.buildings.find((b) => b.building_no === sketchB)
     ? { b: data.buildings.find((b) => b.building_no === sketchB) } : { nb: data.newBuildings.find((b) => b.building_no === sketchB) };
 
@@ -240,11 +276,11 @@ export default function School({ db, me, schoolId }) {
             <div className="spread">
               <h3 style={{ margin: 0 }}>Building {x.building_no} · {x.building_type || 'Type not given'}</h3>
               <div className="btns">
-                <button type="button" className="btn sm secondary" onClick={() => showBuilding(x.building_no)}>Open in Table 1 list</button>
+                {canEdit && <button type="button" className="btn sm secondary" onClick={() => showBuilding(x.building_no)}>Validate in the Table 1 list</button>}
                 <button type="button" className="btn sm" onClick={() => setSketchB(null)}>Hide details</button>
               </div>
             </div>
-            {sketchRec.b ? bDetails(sketchRec.b) : nbDetails(sketchRec.nb)}
+            {bInfo(x, !sketchRec.b)}
           </section>
         );
       })()}
