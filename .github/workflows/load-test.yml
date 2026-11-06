@@ -32,7 +32,7 @@ jobs:
           mkdir -p logs
           run() { # name clients seconds
             echo "=== $1: $2 people at once for $3 s"
-            pgbench "$SUPABASE_DB_URL" -n -M simple -c "$2" -j "$2" -T "$3" --progress=15 \
+            pgbench "$SUPABASE_DB_URL" -n -M simple -r -c "$2" -j "$2" -T "$3" --progress=15 \
               -f school_page.sql@6 -f division_list.sql@2 -f dashboard.sql@1 \
               -l --log-prefix="logs/$1" 2>&1 | grep -vE "^(pgbench \(|transaction type|scaling factor|query mode|number of threads|maximum number|duration)" || true
           }
