@@ -1,0 +1,257 @@
+From b5de7ece868672750b72135db56ed1308cd2ac72 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 3 Nov 2026 08:24:10 +0000
+Subject: [PATCH 2/3] Plain wording: PPRD reverts a clearance (not undo); dates
+ read Month Day, Year (May 31, 2026)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015FZpUfYQMUaz2Hya5AmveL
+---
+ .../20261103003400_revert_wording.sql         | 54 +++++++++++++++++++
+ web/src/components/OtherNsbiData.jsx          |  2 +-
+ web/src/lib/labels.js                         |  2 +-
+ web/src/screens/Dashboard.jsx                 |  2 +-
+ web/src/screens/Inventory.jsx                 |  2 +-
+ web/src/screens/NsbiForm.jsx                  |  2 +-
+ web/src/screens/RegionProgress.jsx            | 16 +++---
+ web/src/screens/Reports.jsx                   |  6 +--
+ web/src/screens/School.jsx                    |  2 +-
+ 9 files changed, 71 insertions(+), 17 deletions(-)
+ create mode 100644 supabase/migrations/20261103003400_revert_wording.sql
+
+diff --git a/supabase/migrations/20261103003400_revert_wording.sql b/supabase/migrations/20261103003400_revert_wording.sql
+new file mode 100644
+index 0000000..806f466
+--- /dev/null
++++ b/supabase/migrations/20261103003400_revert_wording.sql
+@@ -0,0 +1,54 @@
++-- Plain wording (Ada, 2026-11-03): PPRD "reverts" a clearance; the word "undo" is not shown to users.
++
++create or replace function undo_sdo_clearance(p_cycle text, p_sdo text, p_reason text)
++returns bigint
++language plpgsql security definer set search_path = public as $$
++declare
++  v_me profiles;
++  v_c bigint;
++  v_id bigint;
++begin
++  v_me := current_profile();
++  if v_me.role is distinct from 'ro' then perform refuse('Only PPRD reverts a clearance', 'insufficient_privilege'); end if;
++  if exists (select 1 from cycles where id = p_cycle and frozen_at is not null) then
++    perform refuse(format('%s is already closed', p_cycle));
++  end if;
++  select id into v_c from sdo_signoffs where cycle_id = p_cycle and sdo_code = p_sdo;
++  if v_c is null then perform refuse('This Division is not cleared'); end if;
++  if length(btrim(coalesce(p_reason, ''))) < 10 then
++    perform refuse('Give the reason for reverting the clearance (at least 10 characters)');
++  end if;
++  insert into sdo_clearance_undos (clearance_id, cycle_id, sdo_code, reason, undone_by)
++  values (v_c, p_cycle, p_sdo, btrim(p_reason), v_me.id) returning id into v_id;
++  return v_id;
++end $$;
++
++
++create or replace function assert_can_edit(p_cycle text, p_sdo text, p_school text) returns uuid
++language plpgsql stable security definer set search_path = public as $$
++declare
++  v_me profiles;
++  v_cycle cycles;
++begin
++  v_me := current_profile();
++  if v_me.id is null then
++    perform refuse('Sign in first', 'insufficient_privilege');
++  end if;
++  if v_me.role not in ('de', 'dpo', 'school') then
++    perform refuse('Only the SDO (Division Engineer or Planning Officer) or the school records this step', 'insufficient_privilege');
++  end if;
++  if v_me.sdo_code is distinct from p_sdo then
++    perform refuse('This school is not in your SDO', 'insufficient_privilege');
++  end if;
++  if v_me.role = 'school' and v_me.school_id is distinct from p_school then
++    perform refuse('You can update only your own school', 'insufficient_privilege');
++  end if;
++  select * into v_cycle from cycles where id = p_cycle;
++  if v_cycle.role <> 'current' or v_cycle.frozen_at is not null then
++    perform refuse(format('%s is not open for validation', p_cycle));
++  end if;
++  if exists (select 1 from sdo_signoffs where cycle_id = p_cycle and sdo_code = p_sdo) then
++    perform refuse('This Division is already cleared by the Region: nothing more is recorded unless PPRD reverts the clearance');
++  end if;
++  return v_me.id;
++end $$;
+diff --git a/web/src/components/OtherNsbiData.jsx b/web/src/components/OtherNsbiData.jsx
+index f598fab..8f34d9f 100644
+--- a/web/src/components/OtherNsbiData.jsx
++++ b/web/src/components/OtherNsbiData.jsx
+@@ -212,7 +212,7 @@ export default function OtherNsbiData({ db, schoolId, canEdit, isSchool, isSDO,
+     <section className="stack" style={{ gap: 12 }}>
+       <h2>Other tables of the SY 2025–2026 template</h2>
+       <p className="muted small" style={{ margin: 0 }}>
+-        Update each table as of 31 May 2026. An earlier school year's value, where there is one, is shown under each item for reference.
++        Update each table as of May 31, 2026. An earlier school year's value, where there is one, is shown under each item for reference.
+       </p>
+       {shown.map((s) => (
+         <React.Fragment key={s.table}>
+diff --git a/web/src/lib/labels.js b/web/src/lib/labels.js
+index 33f9173..ffbd191 100644
+--- a/web/src/lib/labels.js
++++ b/web/src/lib/labels.js
+@@ -16,7 +16,7 @@ export const STATUS = {
+ export const CYCLE = 'SY2025-2026';
+ 
+ // The data being validated, as the screens name it.
+-export const SOURCE = 'NSBI 2025–2026 (as of 31 May 2026)';
++export const SOURCE = 'NSBI 2025–2026 (as of May 31, 2026)';
+ 
+ export function pct(share) {
+   return `${Math.floor(Number(share || 0) * 100)}%`;
+diff --git a/web/src/screens/Dashboard.jsx b/web/src/screens/Dashboard.jsx
+index 48e2f94..8364154 100644
+--- a/web/src/screens/Dashboard.jsx
++++ b/web/src/screens/Dashboard.jsx
+@@ -91,7 +91,7 @@ function ValidationView({ db, data, label, year, sdo, isRegion, sdos }) {
+ 
+   return (
+     <>
+-      <p className="small muted">NSBI {label} (as of 31 May 2026), beside the validated record.</p>
++      <p className="small muted">NSBI {label} (as of May 31, 2026), beside the validated record.</p>
+       <div className="grid tiles">
+         <Tile big={n(p.schools)} text={`schools · ${n(p.done)} complete`} />
+         <Tile big={pct(p.records ? p.withStatus / p.records : 0)} text="of buildings and rooms validated" />
+diff --git a/web/src/screens/Inventory.jsx b/web/src/screens/Inventory.jsx
+index bf52020..2f135be 100644
+--- a/web/src/screens/Inventory.jsx
++++ b/web/src/screens/Inventory.jsx
+@@ -37,7 +37,7 @@ export default function Inventory({ db, me }) {
+     <main className="page">
+       <h1>Infrastructure Inventory</h1>
+       <p className="muted" style={{ margin: 0 }}>
+-        Each school's buildings and rooms, NSBI 2025–2026 as of 31 May 2026 with the validation so far. Open a school to see its details.
++        Each school's buildings and rooms, NSBI 2025–2026 as of May 31, 2026 with the validation so far. Open a school to see its details.
+       </p>
+       <div className="filters">
+         <label className="f">Find a school<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or School ID" /></label>
+diff --git a/web/src/screens/NsbiForm.jsx b/web/src/screens/NsbiForm.jsx
+index ca6c92b..264df2d 100644
+--- a/web/src/screens/NsbiForm.jsx
++++ b/web/src/screens/NsbiForm.jsx
+@@ -100,7 +100,7 @@ export default function NsbiForm({ db, me, schoolId, preview }) {
+       <div><span>Validated by:</span><i />Engineer III<br />(Schools Division Office)</div>
+     </div>
+   );
+-  const mark = <div className="nf-mark">Pre-filled from the RIVET validated record, DepEd RO7 · Printed {new Date().toLocaleDateString('en-PH')}</div>;
++  const mark = <div className="nf-mark">Pre-filled from the RIVET validated record, DepEd RO7 · Printed {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>;
+   const pad = (rows, min) => rows.concat(Array.from({ length: Math.max(0, min - rows.length) }, () => null));
+   const T = d.t;
+   const w4 = (loc) => [
+diff --git a/web/src/screens/RegionProgress.jsx b/web/src/screens/RegionProgress.jsx
+index 5b72aae..eba4d40 100644
+--- a/web/src/screens/RegionProgress.jsx
++++ b/web/src/screens/RegionProgress.jsx
+@@ -4,7 +4,7 @@ import { CYCLE, n, pct, problem } from '../lib/labels.js';
+ import { CoNotes } from '../components/Returns.jsx';
+ 
+ // Regional home: where each Division stands, clearing a Division, and freezing the cycle.
+-// The ESSD Engineers clear a Division ("Cleared by the Region"); PPRD may undo it with a reason
++// The ESSD Engineers clear a Division ("Cleared by the Region"); PPRD may revert it with a reason
+ // (Ada, 2026-11-03).
+ export default function RegionProgress({ db, me }) {
+   const [rows, setRows] = useState(null);
+@@ -30,17 +30,17 @@ export default function RegionProgress({ db, me }) {
+   useEffect(() => { load(); }, [load]);
+ 
+   async function signOff(sdo) {
+-    const remarks = window.prompt(`Clear ${sdo.sdo_name}? Its schools can then print their pre-filled forms, and nothing more can be recorded for this Division unless PPRD undoes the clearance.\n\nRemarks (optional):`);
++    const remarks = window.prompt(`Clear ${sdo.sdo_name}? Its schools can then print their pre-filled forms, and nothing more can be recorded for this Division unless PPRD reverts the clearance.\n\nRemarks (optional):`);
+     if (remarks === null) return;
+     const { error: e } = await db.rpc('sign_off_sdo', { p_cycle: CYCLE, p_sdo: sdo.sdo_code, p_remarks: remarks });
+     setNote(e ? { err: problem(e) } : { ok: `${sdo.sdo_name} is cleared by the Region.` });
+     load();
+   }
+   async function undo(sdo) {
+-    const reason = window.prompt(`Undo the clearance of ${sdo.sdo_name}? Its schools can be updated again, and the pre-filled forms close until it is cleared again.\n\nReason (kept on record):`);
++    const reason = window.prompt(`Revert the clearance of ${sdo.sdo_name}? Its schools can be updated again, and the pre-filled forms close until it is cleared again.\n\nReason (kept on record):`);
+     if (reason === null) return;
+     const { error: e } = await db.rpc('undo_sdo_clearance', { p_cycle: CYCLE, p_sdo: sdo.sdo_code, p_reason: reason });
+-    setNote(e ? { err: problem(e) } : { ok: `The clearance of ${sdo.sdo_name} is undone.` });
++    setNote(e ? { err: problem(e) } : { ok: `The clearance of ${sdo.sdo_name} is reverted.` });
+     load();
+   }
+ 
+@@ -64,7 +64,7 @@ export default function RegionProgress({ db, me }) {
+   return (
+     <main className="page">
+       <h1>SY 2025–2026 validation, Region VII</h1>
+-      {cycle?.frozen_at && <div className="notice ok">Frozen on {new Date(cycle.frozen_at).toLocaleDateString('en-PH')}: this is the baseline for later NSBI reporting.</div>}
++      {cycle?.frozen_at && <div className="notice ok">Frozen on {new Date(cycle.frozen_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}: this is the baseline for later NSBI reporting.</div>}
+       {note?.ok && <div className="notice ok">{note.ok}</div>}
+       {note?.err && <ErrorNote error={note.err} />}
+       <div className="today-top">
+@@ -94,9 +94,9 @@ export default function RegionProgress({ db, me }) {
+                   <td data-label="Cleared by the Region" onClick={(e) => e.stopPropagation()}>
+                     {r.signed_at ? (
+                       <div className="stack" style={{ gap: 4 }}>
+-                        <span className="chip green">Cleared {new Date(r.signed_at).toLocaleDateString('en-PH')}</span>
++                        <span className="chip green">Cleared {new Date(r.signed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                         {hist[r.sdo_code]?.[0]?.cleared_by && <span className="small muted">by {hist[r.sdo_code][0].cleared_by}</span>}
+-                        {me.role === 'ro' && !cycle?.frozen_at && <button type="button" className="btn sm danger" onClick={() => undo(r)}>Undo clearance</button>}
++                        {me.role === 'ro' && !cycle?.frozen_at && <button type="button" className="btn sm danger" onClick={() => undo(r)}>Revert clearance</button>}
+                       </div>
+                     ) : (
+                       <div className="stack" style={{ gap: 4 }}>
+@@ -104,7 +104,7 @@ export default function RegionProgress({ db, me }) {
+                           title={Number(r.schools_complete) < Number(r.schools) ? 'Every school must be marked Complete first' : undefined} onClick={() => signOff(r)}>Clear the Division</button>
+                           : <span className="small muted">Not yet</span>}
+                         {hist[r.sdo_code]?.find((x) => x.undone_at) && (() => { const u = hist[r.sdo_code].find((x) => x.undone_at);
+-                          return <span className="small" style={{ color: 'var(--amber)' }}>Clearance undone {new Date(u.undone_at).toLocaleDateString('en-PH')}: {u.undo_reason}</span>; })()}
++                          return <span className="small" style={{ color: 'var(--amber)' }}>Clearance reverted {new Date(u.undone_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}: {u.undo_reason}</span>; })()}
+                       </div>
+                     )}
+                   </td>
+diff --git a/web/src/screens/Reports.jsx b/web/src/screens/Reports.jsx
+index fa80f9d..ffb2996 100644
+--- a/web/src/screens/Reports.jsx
++++ b/web/src/screens/Reports.jsx
+@@ -27,7 +27,7 @@ const sumKeys = (m, re, level) => Object.entries(m || {}).reduce((a, [k, v]) =>
+ const load = {
+   facilities: async (db, f) => ({
+     rows: await fetchAll(() => scoped(db.from('report_facilities').select('*').eq('cycle_id', CYCLE).order('school_id'), f)),
+-    source: 'NSBI 2025–2026 (as of 31 May 2026), with the SDO validation recorded in RIVET',
++    source: 'NSBI 2025–2026 (as of May 31, 2026), with the SDO validation recorded in RIVET',
+   }),
+   byCondition: (kind) => async (db, f) => {
+     const raw = await fetchAll(() => scoped(db.from('dash_by_school').select('school_id, label, nsbi, validated').eq('cycle_id', CYCLE).eq('kind', kind).order('school_id').order('label'), f));
+@@ -142,7 +142,7 @@ const col = (key, label, get, fmt) => ({ key, label, get: get ?? ((r) => Number(
+ 
+ const REPORTS = [
+   { group: 'Physical Facilities', id: 'instructional', title: 'Instructional Rooms', loader: 'facilities', src: 'CLS', prior: /^instructional_rooms_/, validated: 'instructional_validated',
+-    note: 'SY 2025–2026: NSBI is the rooms each school encoded as instructional in the NSBI (as of 31 May 2026); Validated is the usable rooms after the SDO\'s validation in RIVET. Rooms that are condemned or under construction, or in such a building, are usage-locked and counted apart. Earlier years: CO\'s number of classrooms, as released.',
++    note: 'SY 2025–2026: NSBI is the rooms each school encoded as instructional in the NSBI (as of May 31, 2026); Validated is the usable rooms after the SDO\'s validation in RIVET. Rooms that are condemned or under construction, or in such a building, are usage-locked and counted apart. Earlier years: CO\'s number of classrooms, as released.',
+     columns: [col('instructional_nsbi', 'NSBI'), col('instructional_validated', 'Validated'), col('chg', 'Change', (r) => Number(r.instructional_validated) - Number(r.instructional_nsbi), signed), col('rooms_locked', 'Usage locked')] },
+   { group: 'Physical Facilities', id: 'noninstructional', title: 'Non-Instructional Rooms', loader: 'facilities', src: 'CLS', prior: /^noninstructional_rooms_/, validated: 'noninstructional_validated',
+     note: 'SY 2025–2026: NSBI as encoded by the schools, beside the validated record. Earlier years: CO\'s number of classrooms, as released.',
+@@ -547,7 +547,7 @@ function SumTable({ out }) {
+ }
+ 
+ function ListTable({ rows, cols, schools, source }) {
+-  const fmt = (k, v) => (k.endsWith('_at') && v ? new Date(v).toLocaleDateString('en-PH') : v);
++  const fmt = (k, v) => (k.endsWith('_at') && v ? new Date(v).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : v);
+   return (
+     <>
+       <div className="scroll">
+diff --git a/web/src/screens/School.jsx b/web/src/screens/School.jsx
+index b185299..3ade9af 100644
+--- a/web/src/screens/School.jsx
++++ b/web/src/screens/School.jsx
+@@ -243,7 +243,7 @@ export default function School({ db, me, schoolId }) {
+         isSDO={isSDO} isSchool={isSchool} onDone={(m) => { setNote({ ok: m }); load(); }} />
+ 
+       {isSchool && (
+-        <div className="notice info">Check each building and room against the school as of 31 May 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
++        <div className="notice info">Check each building and room against the school as of May 31, 2026. Where something is wrong or missing, update it here: your update goes to the Division Engineer, who validates it.</div>
+       )}
+       <div className="tabs" role="tablist">
+         {[['list', 'Buildings and rooms'], ['sketch', 'Site sketch'], ['other', 'Other NSBI tables']].map(([k, l]) => (
+-- 
+2.43.0
+

@@ -1,0 +1,37 @@
+From d2d72a4fcb33f78de770f50f0fc0f2bc717624d2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 3 Nov 2026 08:31:00 +0000
+Subject: [PATCH 3/3] Accounts page: drop the internal note on where SDO
+ accounts are made; ESSD accounts show as ESSD Engineer (clears Divisions)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015FZpUfYQMUaz2Hya5AmveL
+---
+ web/src/screens/StaffAccounts.jsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/web/src/screens/StaffAccounts.jsx b/web/src/screens/StaffAccounts.jsx
+index 40dc4d9..b6a8c0c 100644
+--- a/web/src/screens/StaffAccounts.jsx
++++ b/web/src/screens/StaffAccounts.jsx
+@@ -47,7 +47,7 @@ export default function StaffAccounts({ db }) {
+       </div>
+       <p className="muted" style={{ margin: 0 }}>
+         Set a new password when someone cannot sign in or has forgotten theirs, then give it to them yourself. No email is sent.
+-        They can change it after signing in, with "Change password". New SDO accounts are still made in Supabase; school accounts by the DPO.
++        They can change it after signing in, with "Change password".
+       </p>
+ 
+       {note?.ok && (
+@@ -68,7 +68,7 @@ export default function StaffAccounts({ db }) {
+                 <React.Fragment key={a.id}>
+                   <tr>
+                     <td>{a.full_name}<div className="small muted">{a.email}</div></td>
+-                    <td data-label="Role" className="small">{a.role === 'co' && a.office ? 'View only' : ROLE[a.role]}</td>
++                    <td data-label="Role" className="small">{a.role === 'co' && a.office ? (/^ESSD/i.test(a.office) ? 'ESSD Engineer (clears Divisions)' : 'View only') : ROLE[a.role]}</td>
+                     <td data-label="Office" className="small">{office(a)}</td>
+                     <td data-label="Last sign-in" className="small">
+                       {a.last_sign_in_at ? when(a.last_sign_in_at) : <span className="muted">Not yet</span>}
+-- 
+2.43.0
+
