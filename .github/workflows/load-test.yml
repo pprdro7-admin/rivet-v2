@@ -1,0 +1,45 @@
+name: Load test
+
+# Pretends many Bohol and Cebu Province users are working at the same time, to see how the
+# validation database copes before the region-wide rollout. Reads only: every transaction is
+# read-only and stops after 8 seconds, like the website's own requests. About 3 minutes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-v2q3if]
+    paths: [.github/workflows/load-test.yml]
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    environment: validation
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: What is being tested
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -X -A -t -c "select 'Schools (' || sdo_code || '): ' || count(*) from cycle_schools where cycle_id = 'SY2025-2026' and sdo_code in ('BOH', 'CEB') group by sdo_code"
+          psql "$SUPABASE_DB_URL" -X -A -t -c "select 'Buildings in Bohol and Cebu Province: ' || count(*) from building_status where cycle_id = 'SY2025-2026' and school_id in (select school_id from cycle_schools where cycle_id = 'SY2025-2026' and sdo_code in ('BOH', 'CEB'))"
+          psql "$SUPABASE_DB_URL" -X -A -t -c "select 'Database size: ' || pg_size_pretty(pg_database_size(current_database()))"
+      - name: Run the load test
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          export PATH="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1):$PATH"
+          cd scripts/loadtest
+          mkdir -p logs
+          run() { # name clients seconds
+            echo "=== $1: $2 people at once for $3 s"
+            pgbench "$SUPABASE_DB_URL" -n -M simple -c "$2" -j "$2" -T "$3" --progress=15 \
+              -f school_page.sql@6 -f division_list.sql@2 -f dashboard.sql@1 \
+              -l --log-prefix="logs/$1" 2>&1 | grep -vE "^(pgbench \(|transaction type|scaling factor|query mode|number of threads|maximum number|duration)" || true
+          }
+          run quiet 1 30
+          run c05 5 45
+          run c10 10 45
+          run c15 15 45
+      - name: Summary
+        if: always()
+        run: python3 scripts/loadtest/summary.py scripts/loadtest/logs | tee -a "$GITHUB_STEP_SUMMARY"
