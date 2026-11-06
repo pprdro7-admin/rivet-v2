@@ -62,7 +62,7 @@ Other rules worth knowing: building numbers are never reused (a new building tak
 | Accounts and passwords | Supabase Auth + `profiles` table; RIVET Accounts page | RIVET's "Set new password" works for de/dpo/co/school but skips ro/admin by design. Ada's own (ro) password is reset in Supabase SQL Editor or Authentication > Users > Send password recovery. |
 | Profile SQL already run | `/mnt/project-files/rivet-v2/pilot-dpo-profiles.sql`, `sdo-engineer-profiles.sql` | Reference only. |
 
-**Before Ms EJ takes over the accounts:** decide whether she signs in to GitHub, Supabase and Netlify with Ada's logins or is **invited as a member** (better: GitHub collaborator/admin on the repo, Supabase org member, Netlify team member). Then give Ms EJ her own RIVET account with role `ro`. The longer-term plan is to move everything to an RO7 IT organisation account.
+**Accounts for the handover (decided by Ada, Nov 6, 2026):** Ms EJ uses the same **PPRD RO7 admin** logins for GitHub (`pprdro7-admin`), Supabase and Netlify, and the new Claude Code session is connected under that same admin account. Nothing has to be re-invited or re-pointed. Ada passes the login details to Ms EJ directly (never in this document or the repo). Give Ms EJ her own RIVET sign-in with role `ro` so her actions on the site are recorded under her name. The longer-term plan is still to move everything to an RO7 IT organisation account.
 
 ## 5. Release routine (do this every time)
 
@@ -164,7 +164,7 @@ Notes:
 - **Claude project memory and threads.** This document replaces them.
 - **Claude artifacts** (links above). They belong to Ada's claude.ai account. Ada can share each with Ms EJ, or Ms EJ uses the PDFs/MP4s in the project files.
 - **The local drive** (section 7).
-- **Claude's GitHub access.** In the new session, connect GitHub (claude.ai/connect-github) with an account that can push to `pprdro7-admin/rivet-v2`, and make sure the Claude GitHub App is installed on the repo.
+- **Claude's GitHub access.** The new session runs under the same PPRD RO7 admin account. If it can't reach the repo, connect GitHub at claude.ai/connect-github as `pprdro7-admin` and check that the Claude GitHub App is installed on `pprdro7-admin/rivet-v2`.
 
 ## 11. Key people
 
